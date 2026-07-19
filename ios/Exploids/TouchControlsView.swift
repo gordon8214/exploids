@@ -354,6 +354,26 @@ final class TouchControlsView: UIView {
         // Schub (126) liegt doppelt vor (links + rechts) – die Referenzzählung verhindert, dass
         // das Loslassen des einen den anderen aufhebt.
         case .playing:
+            if scene?.gameMode == .classicAsteroids {
+                return [
+                    // Linker Schub-/Rotations-Cluster bleibt identisch zu den anderen Modi.
+                    TouchButton(id: 6, relativeRect: CGRect(x: 0.02, y: 0.03, width: 0.31, height: 0.54),
+                                label: "SCHUB", kind: .hold(keyCode: 126)),
+                    TouchButton(id: 1, relativeRect: CGRect(x: 0.02, y: 0.59, width: 0.15, height: 0.36),
+                                label: "◄", kind: .hold(keyCode: 123)),
+                    TouchButton(id: 2, relativeRect: CGRect(x: 0.18, y: 0.59, width: 0.15, height: 0.36),
+                                label: "►", kind: .hold(keyCode: 124)),
+                    // Classic teilt die rechte Spalte in drei Arcade-Aktionen.
+                    TouchButton(id: 7, relativeRect: CGRect(x: 0.83, y: 0.03, width: 0.15, height: 0.30),
+                                label: "HYPER", kind: .tap(keyCode: 4)),
+                    TouchButton(id: 3, relativeRect: CGRect(x: 0.83, y: 0.35, width: 0.15, height: 0.30),
+                                label: "THRUST", kind: .hold(keyCode: 126)),
+                    TouchButton(id: 4, relativeRect: CGRect(x: 0.83, y: 0.67, width: 0.15, height: 0.30),
+                                label: "FIRE", kind: .tap(keyCode: 49)),
+                    TouchButton(id: 5, relativeRect: CGRect(x: 0.45, y: 0.0, width: 0.10, height: 0.10),
+                                label: "ESC", kind: .tap(keyCode: 53)),
+                ]
+            }
             return [
                 // Links: großer Schub-Button – füllt fast die ganze linke Spalte ÜBER den
                 // Dreh-Pfeilen (von knapp unter ESC bis kurz über die Pfeile). So lässt sich
@@ -377,7 +397,7 @@ final class TouchControlsView: UIView {
             ]
 
         case .startScreen:
-            return [
+            var startButtons = [
                 // Level −/+ flankieren die zentrale „STARTING LEVEL"-Anzeige (Bildmitte).
                 TouchButton(id: 10, relativeRect: CGRect(x: 0.19, y: 0.49, width: 0.13, height: 0.15),
                             label: "LVL-", kind: .tap(keyCode: 123)),
@@ -402,6 +422,10 @@ final class TouchControlsView: UIView {
                 TouchButton(id: 14, relativeRect: CGRect(x: 0.85, y: 0.78, width: 0.13, height: 0.17),
                             label: "INFO", kind: .typeChar("i")),
             ]
+            if scene?.selectedGameMode == .classicAsteroids {
+                startButtons.removeAll { $0.id == 10 || $0.id == 11 }
+            }
+            return startButtons
 
         case .nameEntry:
             // Keine eigenen Buttons: Die Initialen-Eingabe nutzt die native iOS-Bildschirmtastatur

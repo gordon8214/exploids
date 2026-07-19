@@ -35,6 +35,9 @@ public final class Ship: SKShapeNode {
     
     /// The flame node visual effect at the rear of the ship.
     private let flameNode = SKShapeNode()
+
+    /// Internes Darstellungsprofil; öffentliche Initializer und Standardfarben bleiben unverändert.
+    private(set) var usesClassicAppearance = false
     
     /// The emitter node for particle-based thruster fire.
     private var thrusterEmitter: SKEmitterNode?
@@ -175,6 +178,30 @@ public final class Ship: SKShapeNode {
         let cgImage = context.makeImage()!
         return SKTexture(cgImage: cgImage)
     }
+
+    /// Wechselt ausschließlich Darstellung und Arcade-Physikprofil. Beim Zurückschalten werden die
+    /// bisherigen Exploids-Werte vollständig wiederhergestellt.
+    func applyClassicProfile(_ enabled: Bool) {
+        usesClassicAppearance = enabled
+        if enabled {
+            strokeColor = .white
+            flameNode.strokeColor = .white
+            thrusterEmitter?.particleBirthRate = 0
+            maxVelocity = 480.0
+            thrustAcceleration = 225.0
+            rotationSpeed = 4.42
+            frictionDecayRate = 0.79
+        } else {
+            strokeColor = .cyan
+            flameNode.strokeColor = .orange
+            maxVelocity = 350.0
+            thrustAcceleration = 450.0
+            rotationSpeed = 4.0
+            frictionDecayRate = 0.85
+        }
+        VectorGlowRenderer.markStroke(self)
+        VectorGlowRenderer.markStroke(flameNode)
+    }
     
     // MARK: - Update & Physics
     
@@ -202,10 +229,10 @@ public final class Ship: SKShapeNode {
             let randomScaleY = CGFloat.random(in: 0.8...1.2)
             flameNode.xScale = randomScaleX
             flameNode.yScale = randomScaleY
-            flameNode.strokeColor = Bool.random() ? .orange : .red
+            flameNode.strokeColor = usesClassicAppearance ? .white : (Bool.random() ? .orange : .red)
             
             // Enable particle emitter emission
-            thrusterEmitter?.particleBirthRate = 180
+            thrusterEmitter?.particleBirthRate = usesClassicAppearance ? 0 : 180
         } else {
             flameNode.isHidden = true
             thrusterEmitter?.particleBirthRate = 0

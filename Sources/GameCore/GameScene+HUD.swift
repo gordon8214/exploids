@@ -293,6 +293,7 @@ extension GameScene {
     }
     
     func updateHighScoreLabels() {
+        highScoresTitleLabel.text = isClassicInterfaceActive ? "CLASSIC HIGH SCORES" : "HIGH SCORES"
         for (index, label) in highScoreLineLabels.enumerated() {
             if index < highScores.count {
                 let entry = highScores[index]
@@ -430,34 +431,60 @@ extension GameScene {
         let showDemo = isDemoActive
         // Textbreiten messen (die Zeit ändert sich sekündlich → jede Frame neu zentrieren).
         let wLevel = levelLabel.frame.width
-        let wTime  = timerLabel.frame.width
+        let showTime = gameMode != .classicAsteroids
+        let wTime  = showTime ? timerLabel.frame.width : 0
         let wDemo  = showDemo ? demoOverlayLabel.frame.width : 0
-        let total  = wLevel + gap + wTime + (showDemo ? gap + wDemo : 0)
+        let total  = wLevel + (showTime ? gap + wTime : 0) + (showDemo ? gap + wDemo : 0)
         var x = -total / 2
-        levelLabel.position = CGPoint(x: x, y: rowY); x += wLevel + gap
-        timerLabel.position = CGPoint(x: x, y: rowY); x += wTime + gap
+        levelLabel.position = CGPoint(x: x, y: rowY); x += wLevel
+        if showTime {
+            x += gap
+            timerLabel.position = CGPoint(x: x, y: rowY)
+            x += wTime
+        }
+        if showDemo { x += gap }
         if showDemo { demoOverlayLabel.position = CGPoint(x: x, y: rowY) }
     }
     
     func updateLevelSelectionLabel() {
+        if selectedMode == .classicAsteroids {
+            levelSelectionLabel.text = "STARTING WAVE: 1"
+            if gameState == .startScreen { levelSelectionLabel.isHidden = true }
+            return
+        }
         let isCompleted = selectedStartLevel < maxLevelReached
         let starStr = isCompleted ? " ★" : ""
         // Auf Touch-Geräten übernehmen die Buttons die Auswahl -> Tastatur-Hinweis weglassen.
         let hint = isCompactLayout ? "" : "  (◀/▶ TO SELECT)"
         levelSelectionLabel.text = "STARTING LEVEL: \(selectedStartLevel)\(starStr)\(hint)"
+        if gameState == .startScreen { levelSelectionLabel.isHidden = false }
     }
 
     func updateModeSelectionLabel() {
-        let modeName = (selectedMode == .madMeteoroids) ? "MAD METEOROIDS" : "ANCIENT ASTEROIDS"
+        let modeName: String
+        switch selectedMode {
+        case .ancientAsteroids: modeName = "ANCIENT ASTEROIDS"
+        case .madMeteoroids: modeName = "MAD METEOROIDS"
+        case .classicAsteroids: modeName = "CLASSIC ASTEROIDS"
+        }
         let hint = isCompactLayout ? "" : "  (▲/▼ TO SELECT)"
         modeSelectionLabel.text = "MODE: \(modeName)\(hint)"
+        if selectedMode == .classicAsteroids {
+            instructionsLabel.text = "W/▲: THRUST   A/D/◀/▶: ROTATE   SPACE: FIRE   H: HYPERSPACE   I: GLOSSARY   O: SETTINGS"
+        } else {
+            instructionsLabel.text = "W/▲: THRUST   A/D/◀/▶: ROTATE   SPACE: FIRE (HOLD = AUTO)   I: GLOSSARY   O: SETTINGS"
+        }
     }
 
     /// Aktualisiert die vier Umschalt-Zeilen der Einstellungen mit dem aktuellen Stand.
     func updateSettingsLabels() {
         settingsMusicLabel.text = "MUSIC: \(MusicPlayer.shared.isEnabled ? "ON" : "OFF")"
-        settingsSfxLabel.text = "SFX STYLE: \(SoundManager.shared.useSampledSFX ? "SAMPLE" : "PROCEDURAL")"
-        settingsAutoFireLabel.text = "AUTO-FIRE: \(autoFire ? "ON" : "OFF")"
+        settingsSfxLabel.text = isClassicInterfaceActive
+            ? "SFX STYLE: CLASSIC SYNTH (FIXED)"
+            : "SFX STYLE: \(SoundManager.shared.useSampledSFX ? "SAMPLE" : "PROCEDURAL")"
+        settingsAutoFireLabel.text = isClassicInterfaceActive
+            ? "AUTO-FIRE: DISABLED"
+            : "AUTO-FIRE: \(autoFire ? "ON" : "OFF")"
         if isHDRGlowAvailable {
             settingsHDRGlowLabel.text = "HDR GLOW: \(hdrGlowEnabled ? "ON" : "OFF")"
         } else {
@@ -469,6 +496,11 @@ extension GameScene {
 
     /// Aktualisiert die Extra-Leben-Anzeige (nur sichtbar, wenn welche vorhanden).
     func updateLivesLabel() {
+        if gameMode == .classicAsteroids && gameState == .playing {
+            livesLabel.text = "SHIPS: \(classicSession.shipsRemaining)"
+            livesLabel.isHidden = false
+            return
+        }
         if extraLives > 0 {
             livesLabel.text = "LIVES: \(extraLives)"
             livesLabel.isHidden = (gameState != .playing)

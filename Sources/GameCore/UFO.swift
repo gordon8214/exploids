@@ -13,8 +13,14 @@ public final class UFO: SKShapeNode {
     
     /// Base points awarded when destroyed.
     public var pointValue: Int {
+        if usesClassicBehavior { return isSmall ? 1000 : 200 }
         return isSmall ? 500 : 200
     }
+
+    /// Internes Classic-Profil; die öffentlichen Initializer bleiben unverändert.
+    private(set) var usesClassicBehavior = false
+    var classicNextCourseChange: TimeInterval = 0.0
+    private var classicLastFireTime: TimeInterval = -1.0
     
     // Bewegungs-Parameter: leichtes seitliches Schlingern + sanfte Verfolgung des Spielers.
     private var wavyTime: TimeInterval = 0.0
@@ -126,6 +132,13 @@ public final class UFO: SKShapeNode {
     /// gedeckelt (siehe `homingAccel`/`maxSpeed`), damit es nicht zu schwer wird.
     public func update(deltaTime: TimeInterval, target: CGPoint? = nil) {
         let dt = CGFloat(deltaTime)
+
+        if usesClassicBehavior {
+            position.x += velocity.x * dt
+            position.y += velocity.y * dt
+            return
+        }
+
         wavyTime += deltaTime
 
         // Sanfte Verfolgung: leicht Richtung Spieler beschleunigen.
@@ -188,6 +201,41 @@ public final class UFO: SKShapeNode {
         )
         
         return Laser(position: spawnPos, angle: angle, type: .enemy)
+    }
+
+    /// Aktiviert die weiße, ungefüllte Arcade-Darstellung und die rein horizontale Grundbewegung.
+    func applyClassicBehavior(startOnLeft: Bool, currentTime: TimeInterval) {
+        usesClassicBehavior = true
+        strokeColor = .white
+        fillColor = .clear
+        lineWidth = 1.8
+        let horizontalSpeed: CGFloat = isSmall ? 165.0 : 115.0
+        velocity = CGPoint(x: startOnLeft ? horizontalSpeed : -horizontalSpeed, y: 0.0)
+        classicNextCourseChange = currentTime + 2.13
+        classicLastFireTime = currentTime - 1.0
+        VectorGlowRenderer.markStroke(self)
+    }
+
+    /// Classic-Saucer-Schuss: große Untertasse zufällig, kleine mit ab 35.000 Punkten engerem Fehler.
+    func shootClassic(target: CGPoint, score: Int, currentTime: TimeInterval,
+                      using rng: inout GameRandom) -> Laser? {
+        guard usesClassicBehavior, currentTime - classicLastFireTime >= 0.67 else { return nil }
+        classicLastFireTime = currentTime
+
+        let angle: CGFloat
+        if isSmall {
+            let base = atan2(target.y - position.y, target.x - position.x)
+            let error: CGFloat = score >= 35_000 ? 0.065 : 0.16
+            angle = base + CGFloat.random(in: -error...error, using: &rng)
+        } else {
+            angle = CGFloat.random(in: 0..<(2.0 * .pi), using: &rng)
+        }
+        let spawn = CGPoint(x: position.x + 15.0 * cos(angle),
+                            y: position.y + 15.0 * sin(angle))
+        let laser = Laser(position: spawn, angle: angle, type: .enemy,
+                          speed: 520.0, lifetime: 1.0)
+        laser.applyClassicAppearance()
+        return laser
     }
     
     /// Returns world-space coordinates of the UFO vertices.

@@ -42,6 +42,8 @@ public final class SoundManager: @unchecked Sendable {
     // Engine Hum State
     private let engineLock = NSLock()
     private var isThrustActive: Bool = false
+    private var isClassicProfileActive: Bool = false
+    private var classicSaucerIsSmall: Bool?
 
     // Kopf-Boss-Stimme: ein tiefes, aufsteigendes „Moooo" (vokal-artig). Gesteuert über
     // setHeadVoice(active:openness:); `openness` (0=Lippen zu/gedämpft, 1=Mund offen/voller) wird
@@ -56,6 +58,12 @@ public final class SoundManager: @unchecked Sendable {
     private var engineVolLfoPhase: Double = 0.0
     private var engineCurrentFrequency: Double = 50.0
     private var engineCurrentVolume: Double = 0.0
+    private var classicNoiseState: UInt32 = 0x6D2B_79F5
+    private var classicNoiseLP: Double = 0.0
+    private var classicSaucerPhase: Double = 0.0
+    private var classicSaucerLFOPhase: Double = 0.0
+    private var classicSaucerVolume: Double = 0.0
+    private var classicSaucerWasSmall = false
 
     // Head Voice Synthesis State (only mutated on the audio render thread)
     private var headVoicePhase: Double = 0.0       // Grundton-Phase
@@ -176,6 +184,29 @@ public final class SoundManager: @unchecked Sendable {
     public func playImplosion() {
         playSound(.implosion)
     }
+
+    /// Classic-Effekte umgehen den Sample-Schalter absichtlich: dieses Profil ist immer der neu
+    /// erzeugte Synth und enthält keinerlei übernommene Samples.
+    public func playClassicShot() { playSound(.classicShot, forceSynth: true) }
+    public func playClassicExplosion() { playSound(.classicExplosion, forceSynth: true) }
+    public func playClassicSaucerFire() { playSound(.classicSaucerFire, forceSynth: true) }
+    public func playClassicHeartbeat(high: Bool) {
+        playSound(high ? .classicHeartbeatHigh : .classicHeartbeatLow, forceSynth: true)
+    }
+
+    public func setClassicProfileActive(_ active: Bool) {
+        engineLock.lock()
+        isClassicProfileActive = active
+        if !active { classicSaucerIsSmall = nil }
+        engineLock.unlock()
+    }
+
+    /// `nil` stoppt den Dauerton, `false`/`true` wählen große/kleine Untertasse.
+    public func setClassicSaucer(isSmall: Bool?) {
+        engineLock.lock()
+        classicSaucerIsSmall = isClassicProfileActive ? isSmall : nil
+        engineLock.unlock()
+    }
     
     /// Sets whether the thrust active state is true or false, ramping the engine hum.
     public func setThrustActive(_ active: Bool) {
@@ -274,6 +305,8 @@ public final class SoundManager: @unchecked Sendable {
             
             self.engineLock.lock()
             let thrustActive = self.isThrustActive
+            let classicProfile = self.isClassicProfileActive
+            let classicSaucer = self.classicSaucerIsSmall
             let headActive = self.isHeadVoiceActive
             let headOpen = self.headVoiceOpenness
             let headRestart = self.headVoiceRestart
@@ -285,8 +318,8 @@ public final class SoundManager: @unchecked Sendable {
                 self.headVoicePhase = 0.0
             }
 
-            let targetFreq: Double = thrustActive ? 120.0 : 50.0
-            let targetVol: Double = thrustActive ? 0.35 : 0.0
+            let targetFreq: Double = thrustActive ? (classicProfile ? 92.0 : 120.0) : 50.0
+            let targetVol: Double = thrustActive ? (classicProfile ? 0.28 : 0.35) : 0.0
             
             let abl = UnsafeMutableAudioBufferListPointer(outputData)
             let localSampleRate = self.sampleRate
@@ -298,7 +331,8 @@ public final class SoundManager: @unchecked Sendable {
             }
             
             if self.engineCurrentVolume < 0.001 && !thrustActive
-                && !headActive && self.headVoiceVolume < 0.001 {
+                && !headActive && self.headVoiceVolume < 0.001
+                && classicSaucer == nil && self.classicSaucerVolume < 0.001 {
                 isSilence.pointee = true
                 self.engineCurrentVolume = 0.0
                 self.headVoiceVolume = 0.0
@@ -338,10 +372,39 @@ public final class SoundManager: @unchecked Sendable {
                 let triangle = 4.0 * abs(norm - 0.5) - 1.0
                 let square = (self.enginePhase.truncatingRemainder(dividingBy: 2.0 * .pi) < .pi) ? 1.0 : -1.0
                 let mixedWave = 0.7 * triangle + 0.3 * square
-                // codereview-ok: SoundManager-Jitter ausdrücklich vom Determinismus/Replay ausgenommen (Plan-Doku, AGENTS.md); Fix optional/niedrige Priorität (2026-07-01)
-                let noise = Double.random(in: -0.05...0.05)
-                
-                var sampleValue = (mixedWave + noise) * finalVolume
+                var sampleValue: Double
+                if classicProfile {
+                    // Kleiner allocation-freier Xorshift-Generator nur für Audio-Rauschen.
+                    var n = self.classicNoiseState
+                    n ^= n << 13; n ^= n >> 17; n ^= n << 5
+                    self.classicNoiseState = n
+                    let noise = Double(Int32(bitPattern: n)) / Double(Int32.max)
+                    self.classicNoiseLP += 0.18 * (noise - self.classicNoiseLP)
+                    sampleValue = self.classicNoiseLP * finalVolume
+                } else {
+                    // codereview-ok: SoundManager-Jitter ausdrücklich vom Determinismus/Replay ausgenommen (Plan-Doku, AGENTS.md); Fix optional/niedrige Priorität (2026-07-01)
+                    let noise = Double.random(in: -0.05...0.05)
+                    sampleValue = (mixedWave + noise) * finalVolume
+                }
+
+                // Eigenständiger Dauerton für große/kleine Classic-Untertassen.
+                let saucerTarget = classicSaucer == nil ? 0.0 : 0.16
+                self.classicSaucerVolume += (saucerTarget - self.classicSaucerVolume) * 0.0015
+                if let isSmall = classicSaucer { self.classicSaucerWasSmall = isSmall }
+                if classicSaucer != nil || self.classicSaucerVolume > 0.0008 {
+                    let isSmall = self.classicSaucerWasSmall
+                    self.classicSaucerLFOPhase += 2.0 * .pi * (isSmall ? 7.0 : 4.0) / localSampleRate
+                    if self.classicSaucerLFOPhase >= 2.0 * .pi {
+                        self.classicSaucerLFOPhase -= 2.0 * .pi
+                    }
+                    let base = isSmall ? 510.0 : 230.0
+                    let depth = isSmall ? 65.0 : 38.0
+                    let frequency = base + sin(self.classicSaucerLFOPhase) * depth
+                    let saucerSquare = self.classicSaucerPhase < .pi ? 1.0 : -1.0
+                    sampleValue += saucerSquare * self.classicSaucerVolume
+                    self.classicSaucerPhase += 2.0 * .pi * frequency / localSampleRate
+                    if self.classicSaucerPhase >= 2.0 * .pi { self.classicSaucerPhase -= 2.0 * .pi }
+                }
 
                 // 2. Synthesize Head Voice (tiefes, aufsteigendes „Moooo")
                 let headTarget = headActive ? 0.45 : 0.0
@@ -401,7 +464,7 @@ public final class SoundManager: @unchecked Sendable {
         sfxLock.unlock()
     }
     
-    private func playSound(_ type: ActiveSound.SoundType) {
+    private func playSound(_ type: ActiveSound.SoundType, forceSynth: Bool = false) {
         guard !isMuted else { return }
         if !audioEngine.isRunning {
             start()
@@ -409,7 +472,7 @@ public final class SoundManager: @unchecked Sendable {
 
         // Sample-Modus: erst versuchen, ein generiertes Sample abzuspielen. Klappt das nicht
         // (kein Sample vorhanden), fällt es unten auf den prozeduralen Synth zurück.
-        if useSampledSFX {
+        if useSampledSFX && !forceSynth {
             loadSamplesIfNeeded()
             if playSampled(name(for: type)) { return }
         }
@@ -433,6 +496,9 @@ public final class SoundManager: @unchecked Sendable {
         case .ufo:           return "ufo"
         case .levelComplete: return "levelcomplete"
         case .implosion:     return "implosion"
+        case .classicShot, .classicExplosion, .classicHeartbeatLow,
+             .classicHeartbeatHigh, .classicSaucerFire:
+            return ""
         }
     }
 
@@ -584,6 +650,11 @@ final class ActiveSound: @unchecked Sendable {
         case ufo
         case levelComplete
         case implosion
+        case classicShot
+        case classicExplosion
+        case classicHeartbeatLow
+        case classicHeartbeatHigh
+        case classicSaucerFire
     }
     
     let type: SoundType
@@ -591,6 +662,7 @@ final class ActiveSound: @unchecked Sendable {
     let totalFrames: Int
     private var phase: Double = 0.0
     private var lastSample: Double = 0.0
+    private var noiseState: UInt32 = 0xA341_316C
     
     init(type: SoundType, sampleRate: Double) {
         self.type = type
@@ -609,6 +681,14 @@ final class ActiveSound: @unchecked Sendable {
             self.totalFrames = Int(0.75 * sampleRate)
         case .implosion:
             self.totalFrames = Int(0.95 * sampleRate)
+        case .classicShot:
+            self.totalFrames = Int(0.12 * sampleRate)
+        case .classicExplosion:
+            self.totalFrames = Int(0.55 * sampleRate)
+        case .classicHeartbeatLow, .classicHeartbeatHigh:
+            self.totalFrames = Int(0.11 * sampleRate)
+        case .classicSaucerFire:
+            self.totalFrames = Int(0.16 * sampleRate)
         }
     }
     
@@ -735,6 +815,39 @@ final class ActiveSound: @unchecked Sendable {
             // Suction swirl sweep effect
             let swirl = 1.0 + 0.35 * sin(progress * 22.0 * 2.0 * .pi)
             sampleValue = filtered * volume * swirl * 0.5
+
+        case .classicShot:
+            let frequency = 1_150.0 - 780.0 * progress
+            let square = phase < .pi ? 1.0 : -1.0
+            sampleValue = square * (1.0 - progress) * 0.20
+            phase += 2.0 * .pi * frequency / sampleRate
+            if phase >= 2.0 * .pi { phase -= 2.0 * .pi }
+
+        case .classicExplosion:
+            noiseState ^= noiseState << 13; noiseState ^= noiseState >> 17; noiseState ^= noiseState << 5
+            let noise = Double(Int32(bitPattern: noiseState)) / Double(Int32.max)
+            let cutoff = 0.22 - 0.18 * progress
+            lastSample += cutoff * (noise - lastSample)
+            sampleValue = lastSample * (1.0 - progress) * (1.0 - progress) * 0.42
+
+        case .classicHeartbeatLow, .classicHeartbeatHigh:
+            let frequency: Double
+            switch type {
+            case .classicHeartbeatHigh: frequency = 78.0
+            default: frequency = 58.0
+            }
+            let square = phase < .pi ? 1.0 : -1.0
+            let envelope = sin(progress * .pi)
+            sampleValue = square * envelope * 0.24
+            phase += 2.0 * .pi * frequency / sampleRate
+            if phase >= 2.0 * .pi { phase -= 2.0 * .pi }
+
+        case .classicSaucerFire:
+            let frequency = 760.0 - 470.0 * progress
+            let triangle = 4.0 * abs((phase / (2.0 * .pi) - floor(phase / (2.0 * .pi))) - 0.5) - 1.0
+            sampleValue = triangle * (1.0 - progress) * 0.23
+            phase += 2.0 * .pi * frequency / sampleRate
+            if phase >= 2.0 * .pi { phase -= 2.0 * .pi }
         }
         
         currentFrame += 1

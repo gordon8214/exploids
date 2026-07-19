@@ -25,6 +25,11 @@ final class AudioSmokeTests: GameCoreTestCase {
         sm.playUfoSound()
         sm.playLevelComplete()
         sm.playImplosion()
+        sm.playClassicShot()
+        sm.playClassicExplosion()
+        sm.playClassicHeartbeat(high: false)
+        sm.playClassicHeartbeat(high: true)
+        sm.playClassicSaucerFire()
         sm.playBossHead()
         sm.stopBossHead()
         sm.stopAllHeadSounds()
@@ -39,6 +44,11 @@ final class AudioSmokeTests: GameCoreTestCase {
         sm.setThrustActive(false)
         sm.setHeadVoice(active: true, openness: 0.5)
         sm.setHeadVoice(active: false, openness: 0.0)
+        sm.setClassicProfileActive(true)
+        sm.setClassicSaucer(isSmall: false)
+        sm.setClassicSaucer(isSmall: true)
+        sm.setClassicSaucer(isSmall: nil)
+        sm.setClassicProfileActive(false)
     }
 
     /// Der Sample-Modus ist ein reiner Laufzeit-Schalter und muss unabhängig vom Audio-Start

@@ -23,6 +23,18 @@ final class VectorGlowTests: GameCoreTestCase {
         XCTAssertNil(shape.fillShader)
     }
 
+    func testClassicAsteroidOutlineStillProducesEDRValuesAboveWhite() throws {
+        resetRenderer()
+        let asteroid = Asteroid(sizeClass: .large)
+        asteroid.applyClassicAppearance(family: 2)
+        asteroid.setScale(0.55)
+
+        let pixels = try render(asteroid, active: true, headroom: 2.4)
+        XCTAssertGreaterThan(maximumRGB(in: pixels), 1.0)
+        XCTAssertEqual(asteroid.fillColor.alphaComponent, 0.0)
+        XCTAssertTrue(VectorGlowRenderer.isStrokeMarked(asteroid))
+    }
+
     func testInactiveMarkedShapeMatchesUnmarkedSDRRendering() throws {
         resetRenderer()
         let baseline = makeTestShape()

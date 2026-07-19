@@ -40,14 +40,32 @@ public enum GameState: Sendable {
 }
 
 /// Auswählbarer Spielmodus. `UInt8`-rawValue + `Codable` für stabile Persistenz im Replay-Format
-/// (ancientAsteroids = 0, madMeteoroids = 1 – Reihenfolge nicht ändern, sonst werden alte Replays
-/// falsch dekodiert).
+/// (ancientAsteroids = 0, madMeteoroids = 1 – bestehende Werte nie ändern, sonst werden alte
+/// Replays falsch dekodiert; Classic wurde kompatibel als 2 angehängt).
 public enum GameMode: UInt8, Sendable, Codable {
     /// Klassischer Modus: festes Spielfeld, Objekte wrappen an den Bildschirmkanten.
     case ancientAsteroids = 0
     /// Neuer Modus: das gesamte Spielfeld (Objekte + Sternenfeld) rotiert kontinuierlich um die
     /// Bildschirmmitte, nur das Spieler-Raumschiff bleibt davon unberührt (vgl. Crazy Comets).
     case madMeteoroids = 1
+    /// Arcade-orientierter Einspieler-Modus mit Wellen, drei Schiffen und monochromen Vektoren.
+    case classicAsteroids = 2
+
+    var next: GameMode {
+        switch self {
+        case .ancientAsteroids: return .madMeteoroids
+        case .madMeteoroids: return .classicAsteroids
+        case .classicAsteroids: return .ancientAsteroids
+        }
+    }
+
+    var previous: GameMode {
+        switch self {
+        case .ancientAsteroids: return .classicAsteroids
+        case .madMeteoroids: return .ancientAsteroids
+        case .classicAsteroids: return .madMeteoroids
+        }
+    }
 }
 
 /// Zentrale Gameplay-Tuning-Konstanten (Waffen, Einsammeln, Splits) — nach dem Muster von
@@ -102,6 +120,7 @@ public final class GameScene: SKScene {
         case bossHead
         case spaceCat        // von einer Weltraumkatze gerammt
         case spaceCatLaser   // von den Laseraugen einer Weltraumkatze getroffen
+        case hyperspaceMalfunction
     }
     
     public var lastDeathCause: DeathCause = .largeAsteroid
@@ -162,6 +181,8 @@ public final class GameScene: SKScene {
     
     /// Persistent high scores.
     public private(set) var highScores: [HighScore] = []
+    private var standardHighScores: [HighScore] = []
+    private var classicHighScores: [HighScore] = []
     /// Persistenz für Highscores + maximal erreichtes Level (UserDefaults-Details ausgelagert).
     private let highScoreStore = HighScoreStore()
 
@@ -231,6 +252,12 @@ public final class GameScene: SKScene {
     public private(set) var gameMode: GameMode = .ancientAsteroids
     /// Der auf dem Startscreen vorgewählte Modus.
     var selectedMode: GameMode = .ancientAsteroids
+    /// Öffentliche Nur-Lese-Sicht für die iOS-Shell, damit deren Menütasten der Auswahl folgen.
+    public var selectedGameMode: GameMode { selectedMode }
+
+    /// Kleine, ausschließlich im dritten Modus genutzte Sitzungsstruktur. Ancient/Mad lesen oder
+    /// mutieren sie nicht und behalten damit ihren bisherigen Simulationspfad.
+    var classicSession = ClassicSession()
 
     // Mad-Meteoroids: Rotations-Zustand des Spielfelds (nur im madMeteoroids-Modus aktiv)
     /// Aktuelle Winkelgeschwindigkeit des Feldes in Radiant/Sekunde (Vorzeichen = Drehrichtung).
@@ -254,7 +281,7 @@ public final class GameScene: SKScene {
     private var fieldRotationPending: Bool = false
 
     // Level and countdown progression state
-    public private(set) var currentLevel: Int = 1
+    public internal(set) var currentLevel: Int = 1
     public private(set) var maxLevelReached: Int = 1
     public internal(set) var selectedStartLevel: Int = 1
     public internal(set) var levelTimeRemaining: TimeInterval = 120.0
@@ -695,6 +722,10 @@ public final class GameScene: SKScene {
         // Zum sofortigen Vergleich spielt direkt ein Bestätigungs-Sound im NEUEN Modus.
         // Ebenfalls überall außer bei der Initialen-Eingabe (dort ist „N" ein Buchstabe).
         if gameState != .nameEntry, charactersIgnoringModifiers?.lowercased() == "n" {
+            if isClassicInterfaceActive {
+                updateSettingsLabels()
+                return
+            }
             SoundManager.shared.useSampledSFX.toggle()
             updateSettingsLabels()
             SoundManager.shared.playPowerUp()
@@ -703,6 +734,10 @@ public final class GameScene: SKScene {
 
         // „F" schaltet Auto-Feuer um (global außer bei der Initialen-Eingabe).
         if gameState != .nameEntry, charactersIgnoringModifiers?.lowercased() == "f" {
+            if isClassicInterfaceActive {
+                updateSettingsLabels()
+                return
+            }
             autoFire.toggle()
             updateSettingsLabels()
             return
@@ -725,21 +760,30 @@ public final class GameScene: SKScene {
                 return
             }
             if keyCode == 49 || keyCode == 36 { // Space or Enter
-                currentLevel = selectedStartLevel
+                currentLevel = selectedMode == .classicAsteroids ? 1 : selectedStartLevel
                 transitionTo(.playing)
             } else if keyCode == 123 || (keyCode == 0 && characters?.lowercased() == "a") { // Left arrow or A
-                if selectedStartLevel > 1 {
+                if selectedMode != .classicAsteroids && selectedStartLevel > 1 {
                     selectedStartLevel -= 1
                     updateLevelSelectionLabel()
                 }
             } else if keyCode == 124 || (keyCode == 2 && characters?.lowercased() == "d") { // Right arrow or D
-                if selectedStartLevel < 10 {
+                if selectedMode != .classicAsteroids && selectedStartLevel < 10 {
                     selectedStartLevel += 1
                     updateLevelSelectionLabel()
                 }
-            } else if keyCode == 126 || keyCode == 125 { // Up or Down arrow -> toggle game mode
-                selectedMode = (selectedMode == .ancientAsteroids) ? .madMeteoroids : .ancientAsteroids
+            } else if keyCode == 126 { // Up arrow -> next game mode
+                selectedMode = selectedMode.next
+                activateHighScoreBoard(for: selectedMode)
+                updateHighScoreLabels()
                 updateModeSelectionLabel()
+                updateLevelSelectionLabel()
+            } else if keyCode == 125 { // Down arrow -> previous game mode
+                selectedMode = selectedMode.previous
+                activateHighScoreBoard(for: selectedMode)
+                updateHighScoreLabels()
+                updateModeSelectionLabel()
+                updateLevelSelectionLabel()
             } else if let digit = digitForKey(keyCode: keyCode, characters: characters), (1...5).contains(digit) {
                 // Zahlentaste 1–5: Replay des entsprechenden Highscore-Eintrags ansehen (falls einer
                 // mit gespeicherter, kompatibler Aufnahme existiert).
@@ -761,9 +805,17 @@ public final class GameScene: SKScene {
                 return
             }
             if characters == "#" { // Undokumentierter Cheat: ein Extra-Leben (zum Testen)
-                extraLives += 1
+                if gameMode == .classicAsteroids {
+                    classicSession.shipsRemaining += 1
+                } else {
+                    extraLives += 1
+                }
                 updateLivesLabel()
                 showPowerUpNotification(text: "EXTRA LIFE!", color: SKColor(red: 1.0, green: 0.3, blue: 0.45, alpha: 1.0))
+                return
+            }
+            if gameMode == .classicAsteroids && keyCode == 4 { // H: Hyperraum
+                activateClassicHyperspace()
                 return
             }
             activeKeys.insert(keyCode)
@@ -860,6 +912,10 @@ public final class GameScene: SKScene {
     
     /// Spawns a laser from the ship's tip with a cooldown limit.
     func fireLaser() {
+        if gameMode == .classicAsteroids {
+            fireClassicLaser()
+            return
+        }
         let now = gameTime
         let isRapidActive = now < rapidFireEndTime
         let cooldown: TimeInterval = isRapidActive ? GameplayTuning.laserCooldownRapid
@@ -1032,6 +1088,14 @@ public final class GameScene: SKScene {
             } else if glossaryContainer.position.y < glossaryScrollBottom {
                 glossaryContainer.position.y = glossaryScrollTop
             }
+            return
+        }
+
+        // Classic besitzt einen bewusst kleinen, eigenständigen Sitzungs-/Simulationspfad. Der
+        // bestehende Ancient/Mad-Rumpf darunter bleibt dadurch unverändert und alte v3-Replays
+        // behalten exakt dieselbe Reihenfolge von Logik und RNG-Ziehungen.
+        if gameState == .playing && gameMode == .classicAsteroids {
+            updateClassicMode(deltaTime: deltaTime)
             return
         }
         
@@ -1777,6 +1841,10 @@ public final class GameScene: SKScene {
     // MARK: - Damage / Shield logic
     
     func damageShip() {
+        if gameMode == .classicAsteroids {
+            destroyClassicShip(cause: lastDeathCause)
+            return
+        }
         if ship.isShieldActive {
             ship.shieldLevel -= 1   // eine Schild-Stufe absorbiert den Treffer
             SoundManager.shared.playExplosion()
@@ -1828,6 +1896,10 @@ public final class GameScene: SKScene {
     
     /// Spawns a new procedurally generated asteroid far away from the ship's center.
     public func spawnAsteroid() {
+        if gameState == .playing && gameMode == .classicAsteroids {
+            spawnClassicLargeAsteroid()
+            return
+        }
         let sizeClass = Asteroid.AsteroidSize.allCases.randomElement(using: &rng) ?? .large
 
         let config = currentConfig()
@@ -2450,7 +2522,7 @@ public final class GameScene: SKScene {
     }
     
     /// Triggers the Game Over state.
-    private func triggerGameOver() {
+    func triggerGameOver() {
         // Aufnahme dieses Laufs abschließen und als `lastReplay` bereitstellen (für die Anbindung an
         // einen Highscore). Während einer Wiedergabe läuft kein Recorder, daher passiert hier nichts.
         if let recorder = recorder {
@@ -2467,12 +2539,19 @@ public final class GameScene: SKScene {
         activeKeys.removeAll()
         SoundManager.shared.setThrustActive(false)
 
-        // Play explosion sound effect
-        SoundManager.shared.playExplosion()
-        createShipExplosion(at: ship.position)
-        
-        // Trigger large camera shake
-        shakeCamera(amplitude: 8.0, numberOfShakes: 8, durationPerShake: 0.04)
+        if gameMode == .classicAsteroids {
+            // Das letzte Schiff ist im Classic-Pfad bereits beim Treffer als weiße Vektortrümmer
+            // explodiert; nach der 2,15-s-Wartezeit hier weder einen zweiten cyanfarbenen Effekt
+            // noch den Standard-Sample-Sound darüberlegen.
+            SoundManager.shared.setClassicSaucer(isSmall: nil)
+        } else {
+            // Play explosion sound effect
+            SoundManager.shared.playExplosion()
+            createShipExplosion(at: ship.position)
+
+            // Trigger large camera shake
+            shakeCamera(amplitude: 8.0, numberOfShakes: 8, durationPerShake: 0.04)
+        }
         
         // Demo-Lauf (Autopilot): KEIN Highscore-Eintrag – der Pilot darf sich nicht verewigen. Die
         // Highscore-Liste wird trotzdem 10 s gezeigt (der Game-Over-Screen enthält sie ohnehin),
@@ -2530,7 +2609,9 @@ public final class GameScene: SKScene {
         // Auto-Feuer-Zustand der Aufnahme wiederherstellen (beeinflusst das Feuern in update() und
         // damit den Spielverlauf). `replayAutoFireOverride` erlaubt es, das für alte Aufnahmen ohne
         // gespeichertes Feld (vor dem Fix) von außen zu erzwingen.
-        autoFire = replayAutoFireOverride ?? replay.autoFire
+        autoFire = replay.gameMode == .classicAsteroids
+            ? false
+            : (replayAutoFireOverride ?? replay.autoFire)
         startNewGame(seed: replay.seed)
         return true
     }
@@ -2657,10 +2738,18 @@ public final class GameScene: SKScene {
         // Stop sound engine hum
         SoundManager.shared.setThrustActive(false)
         SoundManager.shared.stopAllHeadSounds()
+        if case .playing = newState {
+            // Classic-Saucer-Ton wird im nächsten Simulationsschritt aus dem Entity-Zustand gesetzt.
+        } else {
+            SoundManager.shared.setClassicSaucer(isSmall: nil)
+        }
         headWasSpawning = false
         
         switch newState {
         case .startScreen:
+            SoundManager.shared.setClassicProfileActive(false)
+            SoundManager.shared.setClassicSaucer(isSmall: nil)
+            if ship.usesClassicAppearance { ship.applyClassicProfile(false) }
             ship.isHidden = true
             ship.position = .zero
             ship.velocity = .zero
@@ -2670,6 +2759,7 @@ public final class GameScene: SKScene {
             titleLabel.isHidden = false
             startPromptLabel.isHidden = false
             instructionsLabel.isHidden = false
+            activateHighScoreBoard(for: selectedMode)
             // Highscore-Liste nur am Startbildschirm zeigen, wenn nicht ausgelagert (macOS).
             if showsHighScoresOnStartScreen {
                 highScoresTitleLabel.isHidden = false
@@ -2680,7 +2770,7 @@ public final class GameScene: SKScene {
             }
 
             updateLevelSelectionLabel()
-            levelSelectionLabel.isHidden = false
+            levelSelectionLabel.isHidden = selectedMode == .classicAsteroids
 
             updateModeSelectionLabel()
             modeSelectionLabel.isHidden = false
@@ -2723,7 +2813,7 @@ public final class GameScene: SKScene {
                 // Resume game
                 scoreLabel.isHidden = false
                 hiScoreLabel.isHidden = false
-                timerLabel.isHidden = false
+                timerLabel.isHidden = gameMode == .classicAsteroids
                 levelLabel.isHidden = false
                 
                 if isLevelClearing {
@@ -2731,7 +2821,9 @@ public final class GameScene: SKScene {
                     prepareNextLevelLabel.isHidden = false
                 }
                 
-                ship.isHidden = false
+                ship.isHidden = gameMode == .classicAsteroids
+                    ? !classicSession.isShipActive
+                    : false
                 activeKeys.removeAll()
             } else {
                 // Fresh game session
@@ -2761,8 +2853,10 @@ public final class GameScene: SKScene {
                 } else if replayPlayer == nil {
                     // Szenengröße mit aufnehmen: die Wiedergabe muss in derselben Größe laufen, sonst
                     // driftet der Lauf (size beeinflusst Spawns/Wrap/Bounds).
-                    recorder = ReplayRecorder(seed: currentSeed, startLevel: selectedStartLevel,
-                                              gameMode: selectedMode, autoFire: autoFire,
+                    let replayStartLevel = selectedMode == .classicAsteroids ? 1 : selectedStartLevel
+                    let replayAutoFire = selectedMode == .classicAsteroids ? false : autoFire
+                    recorder = ReplayRecorder(seed: currentSeed, startLevel: replayStartLevel,
+                                              gameMode: selectedMode, autoFire: replayAutoFire,
                                               width: Int(size.width), height: Int(size.height))
                     lastReplay = nil
                 }
@@ -2784,7 +2878,7 @@ public final class GameScene: SKScene {
                 lastLaserTime = -1.0
 
                 gameMode = selectedMode
-                currentLevel = selectedStartLevel
+                currentLevel = gameMode == .classicAsteroids ? 1 : selectedStartLevel
                 levelTimeRemaining = (currentLevel >= 10) ? 999999.0 : 60.0
                 isLevelClearing = false
                 playTime = 0.0
@@ -2800,8 +2894,11 @@ public final class GameScene: SKScene {
                 beamNode.isHidden = true
                 updateLivesLabel()
 
-                // Kopf-Boss pro Spiel neu auswürfeln/zurücksetzen.
-                bossFirstTargetLevel = Int.random(in: 5...7, using: &rng)
+                // Kopf-Boss pro Standard-Spiel neu auswürfeln/zurücksetzen. Der Classic-Pfad kennt
+                // keine Bosse und hält seine RNG-Ziehungen in der eigenen Sitzung.
+                if gameMode != .classicAsteroids {
+                    bossFirstTargetLevel = Int.random(in: 5...7, using: &rng)
+                }
                 bossFirstDone = false
                 bossLevel10Done = false
                 nextBossTimeLevel10 = 0.0
@@ -2820,6 +2917,15 @@ public final class GameScene: SKScene {
                 ship.setScale(1.0)
                 ship.isHidden = false
                 ship.shieldLevel = 0
+                if gameMode == .classicAsteroids {
+                    ship.alpha = 1.0
+                    ship.applyClassicProfile(true)
+                } else if ship.usesClassicAppearance {
+                    ship.applyClassicProfile(false)
+                }
+
+                activateHighScoreBoard(for: gameMode)
+                SoundManager.shared.setClassicProfileActive(gameMode == .classicAsteroids)
 
                 // Reset scoring
                 score = 0
@@ -2831,19 +2937,27 @@ public final class GameScene: SKScene {
                 scoreLabel.isHidden = false
                 hiScoreLabel.isHidden = false
                 
-                if currentLevel >= 10 {
+                if gameMode == .classicAsteroids {
+                    timerLabel.text = ""
+                    levelLabel.text = "WAVE: 1"
+                } else if currentLevel >= 10 {
                     timerLabel.text = "TIME: SURVIVAL"
+                    levelLabel.text = "LEVEL: \(currentLevel)"
                 } else {
                     timerLabel.text = "TIME: 01:00"
+                    levelLabel.text = "LEVEL: \(currentLevel)"
                 }
-                levelLabel.text = "LEVEL: \(currentLevel)"
-                timerLabel.isHidden = false
+                timerLabel.isHidden = gameMode == .classicAsteroids
                 levelLabel.isHidden = false
                 
-                // Spawn initial asteroids
-                let initialCount = max(3, currentConfig().maxAsteroids / 2)
-                for _ in 0..<initialCount {
-                    spawnAsteroid()
+                if gameMode == .classicAsteroids {
+                    initializeClassicSession()
+                } else {
+                    // Spawn initial asteroids
+                    let initialCount = max(3, currentConfig().maxAsteroids / 2)
+                    for _ in 0..<initialCount {
+                        spawnAsteroid()
+                    }
                 }
 
                 // Mad-Modus: Rotations-Scheduler beim nächsten Frame aufsetzen (dort liegt die
@@ -3274,18 +3388,39 @@ public final class GameScene: SKScene {
     /// Persistenz-Details (UserDefaults-Keys, Default-Liste) liegen im `HighScoreStore`.
     public func loadHighScores() {
         maxLevelReached = highScoreStore.loadMaxLevelReached()
-        highScores = highScoreStore.loadHighScores()
+        standardHighScores = highScoreStore.loadHighScores()
+        classicHighScores = highScoreStore.loadClassicHighScores()
+        activateHighScoreBoard(for: gameState == .playing ? gameMode : selectedMode)
     }
 
     private func saveHighScores() {
-        highScoreStore.save(highScores)
+        if gameMode == .classicAsteroids {
+            classicHighScores = highScores
+            highScoreStore.saveClassic(classicHighScores)
+        } else {
+            standardHighScores = highScores
+            highScoreStore.save(standardHighScores)
+        }
+    }
+
+    /// Wählt die sichtbare Liste ohne die jeweils andere zu verändern.
+    func activateHighScoreBoard(for mode: GameMode) {
+        highScores = mode == .classicAsteroids ? classicHighScores : standardHighScores
+    }
+
+    /// Liefert eine bestimmte Bestenliste für CLI-Export und Tests, unabhängig von der UI-Auswahl.
+    public func highScores(for mode: GameMode) -> [HighScore] {
+        mode == .classicAsteroids ? classicHighScores : standardHighScores
     }
 
     /// Leert die Highscore-Liste und persistiert die leere Liste. Einstiegspunkt für das CLI-Flag
     /// `--reset-highscores`, wenn die gespeicherten Werte zu hoch geworden sind, um noch reinzukommen.
     public func clearHighScores() {
+        standardHighScores = []
+        classicHighScores = []
         highScores = []
-        saveHighScores()
+        highScoreStore.save(standardHighScores)
+        highScoreStore.saveClassic(classicHighScores)
     }
 
     // MARK: - Replay-Archiv (Aufnahmen als Dateien)
@@ -3306,28 +3441,31 @@ public final class GameScene: SKScene {
     }
     
     private func recordHighScore(initials: String, score: Int) {
+        let progressName = gameMode == .classicAsteroids ? "Wave" : "Level"
         let message: String
         switch lastDeathCause {
         case .largeAsteroid:
-            message = "Hull breach (large asteroid) on Level \(currentLevel)"
+            message = "Hull breach (large asteroid) on \(progressName) \(currentLevel)"
         case .mediumAsteroid:
-            message = "Hull breach (medium asteroid) on Level \(currentLevel)"
+            message = "Hull breach (medium asteroid) on \(progressName) \(currentLevel)"
         case .smallAsteroid:
-            message = "Hull breach (small asteroid) on Level \(currentLevel)"
+            message = "Hull breach (small asteroid) on \(progressName) \(currentLevel)"
         case .wobblingAsteroid:
-            message = "Blown to bits by wobbling bomb on Level \(currentLevel)"
+            message = "Blown to bits by wobbling bomb on \(progressName) \(currentLevel)"
         case .ufo:
-            message = "Rammed by an alien UFO on Level \(currentLevel)"
+            message = "Rammed by an alien UFO on \(progressName) \(currentLevel)"
         case .ufoLaser:
-            message = "Vaporized by UFO laser on Level \(currentLevel)"
+            message = "Vaporized by UFO laser on \(progressName) \(currentLevel)"
         case .gravityWell:
-            message = "Crushed in a black hole on Level \(currentLevel)"
+            message = "Crushed in a black hole on \(progressName) \(currentLevel)"
         case .bossHead:
-            message = "Devoured by the floating idol on Level \(currentLevel)"
+            message = "Devoured by the floating idol on \(progressName) \(currentLevel)"
         case .spaceCat:
-            message = "Pounced by a space cat on Level \(currentLevel)"
+            message = "Pounced by a space cat on \(progressName) \(currentLevel)"
         case .spaceCatLaser:
-            message = "Zapped by space cat eye-beams on Level \(currentLevel)"
+            message = "Zapped by space cat eye-beams on \(progressName) \(currentLevel)"
+        case .hyperspaceMalfunction:
+            message = "Lost in hyperspace on Wave \(currentLevel)"
         }
         
         // Aufnahme dieses Laufs an den Eintrag hängen (falls vorhanden und kodierbar), damit der

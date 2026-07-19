@@ -10,7 +10,7 @@
    durch rechtlich saubere eigene/CC0/lizenzierte Musik ersetzen.
 5. Balance und möglichen Fixed-Timestep-Mikroruckler erst reproduzierbar messen.
 6. Kuratiertes Promo-GIF aus einem guten Replay auswählen/rendern.
-7. Scroll-Modus später als eigenständigen dritten Modus planen.
+7. Scroll-Modus später als eigenständigen zusätzlichen Modus planen.
 
 Veraltete Versions-/Push-Todos und bereits veröffentlichte Replay-/Demo-Arbeit nicht
 als offen übernehmen; vor jedem Release den aktuellen Git-/Versionsstand neu prüfen.

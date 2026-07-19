@@ -10,6 +10,7 @@ public struct HighScoreStore {
     /// UserDefaults-Keys — unverändert aus `GameScene` übernommen, damit bestehende
     /// Spielstände (und Tests, die die Keys direkt setzen) weiter funktionieren.
     public static let highScoresKey = "exploids_high_scores"
+    public static let classicHighScoresKey = "exploids_classic_high_scores"
     public static let maxLevelKey = "exploids_max_level_reached"
 
     public init() {}
@@ -40,9 +41,28 @@ public struct HighScoreStore {
     /// Speichert die komplette Highscore-Liste (überschreibt den alten Stand).
     /// Best-effort: ein Encode-Fehler wird geloggt, nie geworfen.
     public func save(_ highScores: [HighScore]) {
+        save(highScores, key: Self.highScoresKey)
+    }
+
+    /// Classic beginnt absichtlich mit einer leeren, vollständig getrennten Bestenliste.
+    public func loadClassicHighScores() -> [HighScore] {
+        guard let data = UserDefaults.standard.data(forKey: Self.classicHighScoresKey) else { return [] }
+        do {
+            return try JSONDecoder().decode([HighScore].self, from: data)
+        } catch {
+            print("Failed to decode Classic high scores: \(error)")
+            return []
+        }
+    }
+
+    public func saveClassic(_ highScores: [HighScore]) {
+        save(highScores, key: Self.classicHighScoresKey)
+    }
+
+    private func save(_ highScores: [HighScore], key: String) {
         do {
             let data = try JSONEncoder().encode(highScores)
-            UserDefaults.standard.set(data, forKey: Self.highScoresKey)
+            UserDefaults.standard.set(data, forKey: key)
         } catch {
             print("Failed to encode high scores: \(error)")
         }

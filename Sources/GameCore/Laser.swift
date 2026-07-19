@@ -31,6 +31,9 @@ public final class Laser: SKShapeNode {
     
     /// The elapsed time since the laser was fired.
     private var elapsedTime: TimeInterval = 0.0
+
+    /// Kennzeichnet das interne Classic-Profil, ohne die öffentlichen Initializer zu verändern.
+    private(set) var usesClassicAppearance = false
     
     // MARK: - Initializers
     
@@ -115,6 +118,15 @@ public final class Laser: SKShapeNode {
         
         self.fillColor = .clear
         self.lineCap = .round
+        VectorGlowRenderer.markStroke(self)
+    }
+
+    /// Classic-Schüsse sind unabhängig vom Besitzer weiße Vektorstriche.
+    func applyClassicAppearance() {
+        usesClassicAppearance = true
+        strokeColor = .white
+        fillColor = .clear
+        lineWidth = 2.0
         VectorGlowRenderer.markStroke(self)
     }
     

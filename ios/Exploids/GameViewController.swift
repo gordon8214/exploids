@@ -32,6 +32,10 @@ final class GameViewController: UIViewController {
     /// neu aufbauen, damit die Controls im Demo-Modus aus- und danach wieder eingeblendet werden.
     private var lastKnownDemo: Bool = false
 
+    /// Die Modusauswahl kann sich ändern, ohne dass der GameState wechselt. Das Touch-Overlay muss
+    /// dann Level-Tasten bzw. Classic-Steuerung ebenfalls neu aufbauen.
+    private var lastKnownMode: GameMode?
+
     /// Das Float-Drawable wird pro SKView nur einmal aktiviert. Der EDR-Wunsch selbst kann danach
     /// billig mit der Benutzereinstellung bzw. einem Displaywechsel an- und ausgeschaltet werden.
     private var hdrSurfaceConfigured = false
@@ -124,12 +128,22 @@ final class GameViewController: UIViewController {
 
         let current = scene.gameState
         let demo = scene.isDemoRunning
+        let mode = currentStateUsesRunningMode(current) ? scene.gameMode : scene.selectedGameMode
         // Overlay nur aktualisieren, wenn sich State ODER Demo-Status geändert hat.
-        if case .some(let last) = lastKnownState, statesEqual(last, current), demo == lastKnownDemo { return }
+        if case .some(let last) = lastKnownState, statesEqual(last, current),
+           demo == lastKnownDemo, mode == lastKnownMode { return }
         lastKnownState = current
         lastKnownDemo = demo
+        lastKnownMode = mode
         overlay.update(for: current, demoActive: demo)
         updateKeyboard(for: current)
+    }
+
+    private func currentStateUsesRunningMode(_ state: GameState) -> Bool {
+        switch state {
+        case .playing, .quitConfirmation, .nameEntry, .gameOver: return true
+        case .startScreen, .glossary, .highScores, .settings: return false
+        }
     }
 
     /// Bindet SpriteKits CAMetalLayer an den tatsächlich hostenden Bildschirm. Simulatoren und

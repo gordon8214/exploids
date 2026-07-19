@@ -66,6 +66,11 @@ public final class Asteroid: SKShapeNode {
     private var local3DVertices: [Vector3D] = []
     private var edges: [(Int, Int)] = []
     private let wireframeNode = SKShapeNode()
+
+    /// Classic Asteroids zeichnet nur die flache, ungefüllte Außenkontur. Das Profil ist intern,
+    /// damit die öffentlichen Initializer stabil bleiben und Ancient/Mad weiterhin exakt denselben
+    /// prozeduralen Aufbau (einschließlich RNG-Ziehungen) benutzen.
+    private(set) var usesClassicAppearance = false
     
     // 3D rotation angles
     public var pitch: CGFloat = 0.0
@@ -242,6 +247,55 @@ public final class Asteroid: SKShapeNode {
         // Draw the initial frame
         updateWireframePath()
     }
+
+    /// Schaltet einen bereits deterministisch erzeugten Asteroiden auf eine von vier eigenständig
+    /// entworfenen Classic-Konturfamilien um. Die Formen entstehen aus unterschiedlichen harmonischen
+    /// Kurven statt aus historischen Koordinatentabellen.
+    func applyClassicAppearance(family: Int) {
+        usesClassicAppearance = true
+        let radius = sizeClass.rawValue
+        let familyIndex = ((family % 4) + 4) % 4
+        let pointCount = 12
+        var points: [CGPoint] = []
+        points.reserveCapacity(pointCount)
+
+        for index in 0..<pointCount {
+            let angle = CGFloat(index) / CGFloat(pointCount) * 2.0 * .pi
+            let radiusFactor: CGFloat
+            switch familyIndex {
+            case 0:
+                radiusFactor = 0.88 + 0.17 * sin(angle * 3.0 + 0.35)
+                    + 0.10 * cos(angle * 5.0 - 0.2)
+            case 1:
+                radiusFactor = 0.90 + 0.14 * cos(angle * 4.0 + 0.8)
+                    - 0.12 * sin(angle * 2.0 - 0.45)
+            case 2:
+                radiusFactor = 0.87 + 0.16 * sin(angle * 5.0 - 0.7)
+                    + 0.09 * cos(angle * 3.0 + 1.1)
+            default:
+                radiusFactor = 0.91 + 0.13 * cos(angle * 6.0 + 0.25)
+                    - 0.11 * sin(angle * 3.0 + 0.55)
+            }
+            let clamped = min(1.16, max(0.66, radiusFactor))
+            points.append(CGPoint(x: cos(angle) * radius * clamped,
+                                  y: sin(angle) * radius * clamped))
+        }
+
+        vertices = points
+        let outline = CGMutablePath()
+        if let first = points.first {
+            outline.move(to: first)
+            points.dropFirst().forEach { outline.addLine(to: $0) }
+            outline.closeSubpath()
+        }
+        path = outline
+        strokeColor = .white
+        fillColor = .clear
+        lineWidth = 2.0
+        lineJoin = .miter
+        wireframeNode.isHidden = true
+        VectorGlowRenderer.markStroke(self)
+    }
     
     private func updateWireframePath() {
         let cosP = cos(pitch)
@@ -321,6 +375,7 @@ public final class Asteroid: SKShapeNode {
     /// visuell (kein Kollisions-/Sim-State) — wird einmal pro gerendertem Bild aufgerufen, nicht
     /// pro Simulationsschritt (siehe `update(deltaTime:)`).
     public func refreshWireframe() {
+        guard !usesClassicAppearance else { return }
         updateWireframePath()
     }
     

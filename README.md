@@ -4,7 +4,7 @@
 
 <p align="center"><img src="Icon/icon_1024.png" width="180" alt="Exploids app icon"></p>
 
-A native macOS Asteroids-style arcade shooter (Swift 6 · SpriteKit) with a Commodore‑64‑inspired vector look, rendered at modern high resolution and butter‑smooth frame rates (Apple Silicon, ProMotion 120 Hz). Almost every graphic is procedural vector geometry — only the two bosses use traced vector‑contour textures — and every sound effect is synthesized in real time; the bundled media are two chiptune music tracks, the boss textures and an optional pack of recorded sound effects. Two game modes, nine power‑ups, gravity wells, enemy saucers, two bosses, a pixel‑font HUD, and a deterministic replay system that can render promo GIFs headlessly.
+A native macOS Asteroids-style arcade shooter (Swift 6 · SpriteKit) with a Commodore‑64‑inspired vector look, rendered at modern high resolution and butter‑smooth frame rates (Apple Silicon, ProMotion 120 Hz). Almost every graphic is procedural vector geometry — only the two bosses use traced vector‑contour textures — and every sound effect is synthesized in real time; the bundled media are two chiptune music tracks, the boss textures and an optional pack of recorded sound effects. Three game modes, nine power‑ups, gravity wells, enemy saucers, two bosses, a pixel‑font HUD, and a deterministic replay system that can render promo GIFs headlessly.
 
 ## Download
 
@@ -42,14 +42,17 @@ bash wrappers/sign-and-release.sh --publish      # also tags + uploads the DMG t
 
 ## Game modes
 
-Pick on the start screen (▲/▼ to switch, ◀/▶ for the starting level, Space to start):
+Pick on the start screen (▲/▼ to switch, ◀/▶ for the Ancient/Mad starting level, Space to start):
 
-- **Ancient Asteroids** — the classic mode. Fixed playfield; objects wrap around the screen edges.
+- **Ancient Asteroids** — the original Exploids mode. Fixed playfield; objects wrap around the screen edges.
 - **Mad Meteoroids** — the whole field (asteroids, gravity wells, power‑ups, starfield) rotates continuously around the screen center while your ship stays exempt (Crazy‑Comets style). Rotation speed ramps with the level, with scheduled direction changes and occasional "record‑scratch" jolts at higher levels.
+- **Classic Asteroids** — a dedicated, one-player 1979-inspired ruleset: monochrome white gameplay vectors, wave-based normal rocks, single-press four-shot firing, horizontal large/small saucers, three starting ships, a bonus ship at each 10,000 points and `H` hyperspace. It always begins at wave 1, has no power-ups, bosses, special rocks, timer or auto-fire, and keeps its own high-score board. The modern starfield, HUD colors, music toggle and HDR/EDR glow remain.
+
+Classic behavior was implemented from the [original operations manual](https://www.classicgaming.cc/classics/asteroids/files/tech-info/asteroids_manual.pdf) and [recovered program source](https://github.com/historicalsource/asteroids/blob/main/A35131.1A) as references. No Atari art, audio samples, logos, coordinate tables or source code are included.
 
 ## Power‑ups
 
-Nine pickups, each with its own vector glyph:
+Ancient and Mad include nine pickups, each with its own vector glyph. Classic has none:
 
 | Glyph | Power‑up | Effect |
 |:--:|--|--|
@@ -65,7 +68,7 @@ Nine pickups, each with its own vector glyph:
 
 ## Enemies & bosses
 
-Beyond the splitting rocks, the field fills up as you climb the levels:
+In Ancient and Mad, the field fills up as you climb the levels:
 
 - **Enemy saucers** — a large green UFO that fires in random directions, and a small pink one that snipes at your ship. Both drift in with a slight homing pull.
 - **Gravity wells** — black holes that warp space, drag everything inward and crush the ship on contact.
@@ -76,9 +79,10 @@ Beyond the splitting rocks, the field fills up as you climb the levels:
 
 ## Controls
 
-- **Start screen:** ▲/▼ switch game mode · ◀/▶ choose starting level · Space/Enter start · D (or 30 s idle) watch an autopilot demo · I glossary · O settings · 1–5 watch a high‑score replay
-- **In game:** Arrow keys / WASD to fly · Space to fire (hold to charge / sweep the beam) · M toggle music · G toggle HDR Glow · Esc pause / quit
-- **Settings:** M music · N SFX style · F auto-fire · G HDR Glow. HDR Glow defaults to on, remembers your choice and reports `UNAVAILABLE` on SDR-only displays.
+- **Start screen:** ▲/▼ switch game mode · ◀/▶ choose the Ancient/Mad starting level (Classic always starts at wave 1) · Space/Enter start · D (or 30 s idle) watch an Ancient autopilot demo · I glossary · O settings · 1–5 watch a replay from the selected mode's high-score board
+- **Ancient / Mad:** Arrow keys / WASD to fly · Space to fire (hold for auto-fire / the sweeping beam) · M toggle music · G toggle HDR Glow · Esc pause / quit
+- **Classic:** Arrow keys / WASD to fly · press Space once per shot · H hyperspace · M toggle music · G toggle HDR Glow · Esc pause / quit
+- **Settings:** M music · N SFX style · F auto-fire · G HDR Glow. Classic always uses its procedural synth profile and disables auto-fire; music and HDR remain independently toggleable. HDR Glow defaults to on, remembers your choice and reports `UNAVAILABLE` on SDR-only displays.
 - **Replay view:** Esc exits the replay back to the title screen.
 - High scores are saved locally; enter your name on the board when you make the cut.
 - **Cheat:** press `#` for a free extra life — handy for testing, or for a relaxed, no‑pressure run.
@@ -92,7 +96,8 @@ The simulation is **deterministic**: every run is recorded as just its seed plus
 
 ```bash
 exploids --render-demo --out demo.gif            # scripted sample run -> GIF (pipeline self-test)
-exploids --export-replay 0 --out run.replay      # export high-score entry #0's replay to a file
+exploids --export-replay 0 --out run.replay      # export standard-board entry #0 (the default)
+exploids --export-replay 0 --mode classic --out classic.replay
 exploids --render-replay run.replay --out run.gif --scale 480 --fps 30
 ```
 
@@ -100,7 +105,7 @@ exploids --render-replay run.replay --out run.gif --scale 480 --fps 30
 
 Exploids is a hobby clone, not a product. For honest context, with the weak spots named too:
 
-**Versus the original Asteroids (1979)** — the original is monochrome vector graphics with splitting rocks, two saucers, hyperspace and an extra life at 10,000 points. Exploids keeps that core and adds a second, rotating-field mode (Mad Meteoroids), nine power-ups, gravity wells, imploding and wobbling special asteroids, two bosses, a sweeping laser beam, color, chiptune music, an in-game glossary, local high-score entry and deterministic replays you can re-watch or export as GIFs.
+**Versus the original Asteroids (1979)** — Classic Asteroids is now a separate arcade-faithful mode with monochrome outline rocks, two saucers, hyperspace, wave scoring and bonus ships, while retaining Exploids' modern HDR/EDR renderer and deterministic replay system. Ancient Asteroids and the rotating Mad Meteoroids remain the expanded, colorful experience with nine power-ups, gravity wells, special rocks, bosses, a sweeping laser beam and chiptune music.
 
 **Versus Maelstrom** — [Maelstrom](https://github.com/libsdl-org/Maelstrom) (Ambrosia, 1992; a GPL SDL port since 1995, today an SDL2/SDL3 build that runs on Apple Silicon) is the best-known still-maintained open-source Asteroids clone for the Mac, and the fairer yardstick: it already has power-ups, bonus objects and rich sound. Where Exploids actually differs:
 
@@ -119,7 +124,7 @@ Exploids is a hobby clone, not a product. For honest context, with the weak spot
 
 ## iOS target (work in progress)
 
-The repo also contains an iOS app target under `ios/` (SpriteKit + on‑screen touch controls) that links the same `GameCore` engine as the macOS build. It is a young work in progress and not yet released.
+The repo also contains an iOS app target under `ios/` (SpriteKit + on‑screen touch controls) that links the same `GameCore` engine as the macOS build. In Classic, its left flight cluster is unchanged and the right column becomes **HYPER** (tap), **THRUST** (hold) and **FIRE** (tap); Ancient and Mad retain their existing controls. It is a young work in progress and not yet released.
 
 ## Requirements
 

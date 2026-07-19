@@ -2,6 +2,26 @@
 
 All notable changes to Exploids. Dates are ISO 8601 (YYYY-MM-DD).
 
+## [0.16.0] — 2026-07-19
+
+**For players:**
+- Added **Classic Asteroids**, a third mode with arcade waves, monochrome white outline gameplay,
+  four single-press shots, three ships, 10,000-point bonus ships, delayed safe respawns and
+  deterministic hyperspace. It has no power-ups, special rocks, bosses, timer or auto-fire.
+- Classic adds horizontal large and small saucers, rock interactions, its own procedural heartbeat,
+  thrust, shot, explosion and saucer synth cues, plus a separate local high-score board. Music and
+  the existing HDR/EDR glow remain available.
+- iOS Classic controls add a **HYPER** tap button and rearrange the right column into HYPER, THRUST
+  and FIRE without changing Ancient or Mad controls.
+
+**Under the hood:**
+- Added an isolated Classic session/simulation path while preserving Ancient/Mad raw mode values
+  and replay logic version 3. Classic recordings use mode value 2, wave 1, edge-triggered fire,
+  effective auto-fire off and recorded hyperspace input.
+- Added board-selectable replay export (`--mode standard|classic`), dual-board high-score reset,
+  procedural four-family Classic rock outlines and regression coverage for Classic rules, replay,
+  persistence, rendering, audio and iOS-facing state.
+
 ## [0.15.0] — 2026-07-19
 
 **For players:**

@@ -244,8 +244,9 @@ struct Main {
             Options:
               --no-sound    Mute all game sounds and disable audio engine startup.
               --test-mode   Run a headless game simulation for 10 frames and print telemetry, then exit.
-              --export-replay <i> --out <file>
-                            Export the replay attached to high-score entry <i> (0-based) to a file.
+              --export-replay <i> --out <file> [--mode standard|classic]
+                            Export the replay attached to high-score entry <i> (0-based). The board
+                            defaults to standard; classic selects the separate Classic board.
               --render-replay <file> --out <gif> [--scale S] [--sim-scale S] [--fps N] [--stride N]
                                        [--from F] [--max-frames N] [--auto-fire] [--show-hud]
                             Headlessly render a replay file to an animated GIF (no window). The sim runs
@@ -259,7 +260,7 @@ struct Main {
                             Render a whole replay to an h264 video (mp4). For long runs that would be huge
                             as a GIF — real-time, scrub it to pick a GIF segment. HUD shown by default.
               --reset-highscores
-                            Clear the saved high-score list. Run via the app binary with the game closed.
+                            Clear both saved high-score lists. Run via the app binary with the game closed.
               --replay-verify <file> [--auto-fire]
                             Replay a file headlessly (no render) and print the final state — diagnostic.
               --version, -v Show application version.
@@ -356,8 +357,8 @@ struct Main {
         return arguments[i + 1]
     }
 
-    /// `--export-replay <index> --out <file>`: schreibt die an Highscore-Eintrag <index> gehängte
-    /// Aufnahme als Datei (kompaktes Binärformat). Beendet den Prozess.
+    /// `--export-replay <index> --out <file> [--mode standard|classic]`: schreibt die an den
+    /// gewählten Bestenlisten-Eintrag gehängte Aufnahme als Datei. Standard bleibt der Default.
     private static func runExportReplay(arguments: [String], flagIndex: Int) {
         guard flagIndex + 1 < arguments.count, let index = Int(arguments[flagIndex + 1]) else {
             FileHandle.standardError.write(Data("Fehler: --export-replay braucht einen Index.\n".utf8)); exit(2)
@@ -365,15 +366,24 @@ struct Main {
         guard let outPath = argValue(arguments, "--out") else {
             FileHandle.standardError.write(Data("Fehler: --out <file> fehlt.\n".utf8)); exit(2)
         }
+        let modeValue = argValue(arguments, "--mode") ?? "standard"
+        let boardMode: GameMode
+        switch modeValue {
+        case "standard": boardMode = .ancientAsteroids
+        case "classic": boardMode = .classicAsteroids
+        default:
+            FileHandle.standardError.write(Data("Fehler: --mode erwartet standard oder classic.\n".utf8)); exit(2)
+        }
 
         // Szene aufsetzen (lädt Highscores aus dem Store) und Replay des Eintrags holen.
         let view = SKView(frame: CGRect(x: 0, y: 0, width: 800, height: 600))
         let scene = GameScene(size: CGSize(width: 800, height: 600))
         view.presentScene(scene)
-        guard index >= 0, index < scene.highScores.count else {
-            FileHandle.standardError.write(Data("Fehler: Highscore-Index \(index) existiert nicht (0..\(scene.highScores.count - 1)).\n".utf8)); exit(3)
+        let board = scene.highScores(for: boardMode)
+        guard index >= 0, index < board.count else {
+            FileHandle.standardError.write(Data("Fehler: Highscore-Index \(index) existiert nicht (0..\(board.count - 1)) auf dem \(modeValue)-Board.\n".utf8)); exit(3)
         }
-        guard let replay = scene.replay(for: scene.highScores[index]) else {
+        guard let replay = scene.replay(for: board[index]) else {
             FileHandle.standardError.write(Data("Fehler: Eintrag \(index) trägt keine (kompatible) Aufnahme.\n".utf8)); exit(3)
         }
         do {
@@ -481,15 +491,15 @@ struct Main {
         return base.appendingPathComponent("Exploids/replays", isDirectory: true)
     }
 
-    /// `--reset-highscores`: leert die gespeicherte Highscore-Liste und beendet. Danach landen die
-    /// nächsten Läufe wieder in der Liste. Über die App-Binary ausführen (trifft die Bundle-Defaults-
+    /// `--reset-highscores`: leert beide gespeicherten Highscore-Listen und beendet. Danach landen die
+    /// nächsten Läufe wieder in den Listen. Über die App-Binary ausführen (trifft die Bundle-Defaults-
     /// Domain) und nur bei beendetem Spiel (ein laufendes überschreibt die Liste beim nächsten Game Over).
     private static func runResetHighScores() {
         let scene = GameScene(size: CGSize(width: 800, height: 600))
         let view = SKView(frame: CGRect(x: 0, y: 0, width: 800, height: 600))
         view.presentScene(scene)
         scene.clearHighScores()
-        print("Highscores gelöscht (leere Liste gespeichert).")
+        print("Standard- und Classic-Highscores gelöscht (leere Listen gespeichert).")
         exit(0)
     }
 
