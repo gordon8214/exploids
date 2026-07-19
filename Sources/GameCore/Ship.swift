@@ -96,6 +96,7 @@ public final class Ship: SKShapeNode {
         self.fillColor = .clear
         self.lineWidth = 2.0
         self.lineJoin = .miter
+        VectorGlowRenderer.markStroke(self)
         
         // Setup flame node path pointing backwards (left from the rear center indentation)
         let flamePath = CGMutablePath()
@@ -110,6 +111,7 @@ public final class Ship: SKShapeNode {
         flameNode.fillColor = .clear
         flameNode.lineWidth = 1.5
         flameNode.isHidden = true
+        VectorGlowRenderer.markStroke(flameNode)
         self.addChild(flameNode)
         
         // Setup Shield Nodes: drei konzentrische Ringe mit wachsendem Radius (innerster = Stufe 1).
@@ -121,6 +123,7 @@ public final class Ship: SKShapeNode {
             ring.fillColor = (i == 0) ? SKColor(red: 0.0, green: 0.9, blue: 1.0, alpha: 0.08) : .clear
             ring.lineWidth = 1.5
             ring.isHidden = true
+            VectorGlowRenderer.markStroke(ring)
             self.addChild(ring)
         }
         

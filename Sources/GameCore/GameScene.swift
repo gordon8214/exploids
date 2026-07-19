@@ -177,6 +177,48 @@ public final class GameScene: SKScene {
     /// false = Liste ist ausgelagert in die eigene `.highScores`-Ansicht (iOS).
     public var showsHighScoresOnStartScreen: Bool = true
 
+    // MARK: - HDR-Vektorglühen (Displaydaten kommen ausschließlich vom Host)
+
+    /// Vom Spieler gewählte, dauerhaft gespeicherte Präferenz. Sie kann auch `true` bleiben, wenn
+    /// das aktuelle Display kein EDR unterstützt, damit ein später angeschlossenes HDR-Display die
+    /// Einstellung automatisch wieder übernimmt.
+    public private(set) var hdrGlowEnabled: Bool = HDRGlowPreferenceStore.load()
+
+    /// Ob der tatsächlich hostende Bildschirm einen nutzbaren EDR-Pfad anbietet.
+    public private(set) var isHDRGlowAvailable: Bool = false
+
+    /// Die macOS-/iOS-Shell reagiert hierauf, indem sie den CAMetalLayer-Modus umschaltet.
+    public var onHDRGlowPreferenceChanged: ((Bool) -> Void)?
+
+    private var hdrGlowCurrentHeadroom: CGFloat = 1.0
+
+    /// Aktualisiert die vom konkreten Bildschirm gelieferten EDR-Daten. Der Wert beeinflusst nur
+    /// Shader-Uniforms und niemals Simulation, RNG oder Replay-Aufzeichnung.
+    public func updateHDRDisplay(available: Bool, currentHeadroom: CGFloat) {
+        let availabilityChanged = isHDRGlowAvailable != available
+        isHDRGlowAvailable = available
+        hdrGlowCurrentHeadroom = max(1.0, currentHeadroom)
+        applyHDRGlowRenderState()
+        if availabilityChanged { updateSettingsLabels() }
+    }
+
+    private func applyHDRGlowRenderState() {
+        VectorGlowRenderer.update(
+            in: self,
+            active: hdrGlowEnabled && isHDRGlowAvailable,
+            headroom: hdrGlowCurrentHeadroom
+        )
+    }
+
+    private func toggleHDRGlow() {
+        guard isHDRGlowAvailable else { return }
+        hdrGlowEnabled.toggle()
+        HDRGlowPreferenceStore.save(hdrGlowEnabled)
+        applyHDRGlowRenderState()
+        updateSettingsLabels()
+        onHDRGlowPreferenceChanged?(hdrGlowEnabled)
+    }
+
     /// Temporary storage for initials entry.
     var typedInitials: String = ""
 
@@ -458,11 +500,12 @@ public final class GameScene: SKScene {
     let livesLabel = SKLabelNode(fontNamed: "Courier")
     let levelSelectionLabel = SKLabelNode(fontNamed: "Courier-Bold")
     let modeSelectionLabel = SKLabelNode(fontNamed: "Courier-Bold")
-    // Einstellungen-Ansicht: Titel + drei Umschalt-Zeilen + Bedien-Hinweis.
+    // Einstellungen-Ansicht: Titel + vier Umschalt-Zeilen + Bedien-Hinweis.
     let settingsTitleLabel = SKLabelNode(fontNamed: "Courier-Bold")
     let settingsMusicLabel = SKLabelNode(fontNamed: "Courier")
     let settingsSfxLabel = SKLabelNode(fontNamed: "Courier")
     let settingsAutoFireLabel = SKLabelNode(fontNamed: "Courier")
+    let settingsHDRGlowLabel = SKLabelNode(fontNamed: "Courier")
     let settingsHintLabel = SKLabelNode(fontNamed: "Courier")
     let levelClearedLabel = SKLabelNode(fontNamed: "Courier-Bold")
     let prepareNextLevelLabel = SKLabelNode(fontNamed: "Courier")
@@ -527,6 +570,10 @@ public final class GameScene: SKScene {
 
         // Gebündelten Pixel-Font registrieren, bevor die Labels konfiguriert werden.
         RetroFont.registerIfNeeded()
+
+        // Jeder neue Scene-Lauf setzt den prozessweit geteilten Shaderzustand aus seinen eigenen
+        // Hostdaten. Headless-Renderer und Tests bleiben dadurch zuverlässig im SDR-Pfad.
+        applyHDRGlowRenderState()
 
         // Center the anchor point for a retro coordinate system centered at (0, 0)
         self.anchorPoint = CGPoint(x: 0.5, y: 0.5)
@@ -661,6 +708,13 @@ public final class GameScene: SKScene {
             return
         }
 
+        // „G" schaltet den HDR-Vektorglow um. Auf einem SDR-Display ist die Taste bewusst ein
+        // No-op; die gespeicherte Präferenz bleibt für ein späteres HDR-Display erhalten.
+        if gameState != .nameEntry, charactersIgnoringModifiers?.lowercased() == "g" {
+            toggleHDRGlow()
+            return
+        }
+
         switch gameState {
         case .startScreen:
             // Attract-Modus: „D" startet sofort eine Demo. Nur wenn der Attract-Modus aktiv ist –
@@ -780,7 +834,7 @@ public final class GameScene: SKScene {
             }
 
         case .settings:
-            // Umschalten passiert global (M/N/F, oben); hier nur Zurück.
+            // Umschalten passiert global (M/N/F/G, oben); hier nur Zurück.
             if keyCode == 53 { // Escape
                 transitionTo(.startScreen)
             }
@@ -2093,6 +2147,7 @@ public final class GameScene: SKScene {
         shockwave.fillColor = .clear
         shockwave.lineWidth = 3.0
         shockwave.position = ship.position
+        VectorGlowRenderer.markStroke(shockwave)
         self.addChild(shockwave)
         
         let expand = SKAction.scale(to: 60.0, duration: 0.55)
@@ -2583,6 +2638,7 @@ public final class GameScene: SKScene {
         settingsMusicLabel.isHidden = true
         settingsSfxLabel.isHidden = true
         settingsAutoFireLabel.isHidden = true
+        settingsHDRGlowLabel.isHidden = true
         settingsHintLabel.isHidden = true
         levelClearedLabel.isHidden = true
         prepareNextLevelLabel.isHidden = true
@@ -2890,8 +2946,9 @@ public final class GameScene: SKScene {
             settingsMusicLabel.isHidden = false
             settingsSfxLabel.isHidden = false
             settingsAutoFireLabel.isHidden = false
+            settingsHDRGlowLabel.isHidden = false
             // Auf iOS keinen Bedien-Hinweis zeigen (Tap-to-toggle/X-Back versteht sich von selbst und
-            // überlappte den SFX-Button). macOS behält den Tastatur-Hinweis (M/N/F, ESC).
+            // überlappte den SFX-Button). macOS behält den Tastatur-Hinweis (M/N/F/G, ESC).
             settingsHintLabel.isHidden = isCompactLayout
         }
 
@@ -3146,6 +3203,7 @@ public final class GameScene: SKScene {
         flash.fillColor = SKColor(red: 1.0, green: 0.6, blue: 0.15, alpha: 0.9)
         flash.strokeColor = .clear
         flash.zPosition = 6
+        VectorGlowRenderer.markFill(flash)
         addChild(flash)
         flash.run(.sequence([
             .group([.scale(to: 2.2, duration: 0.18), .fadeOut(withDuration: 0.18)]),

@@ -76,8 +76,9 @@ Beyond the splitting rocks, the field fills up as you climb the levels:
 
 ## Controls
 
-- **Start screen:** ▲/▼ switch game mode · ◀/▶ choose starting level · Space/Enter start · D (or 30 s idle) watch an autopilot demo · I glossary · 1–5 watch a high‑score replay
-- **In game:** Arrow keys / WASD to fly · Space to fire (hold to charge / sweep the beam) · M toggle music · Esc pause / quit
+- **Start screen:** ▲/▼ switch game mode · ◀/▶ choose starting level · Space/Enter start · D (or 30 s idle) watch an autopilot demo · I glossary · O settings · 1–5 watch a high‑score replay
+- **In game:** Arrow keys / WASD to fly · Space to fire (hold to charge / sweep the beam) · M toggle music · G toggle HDR Glow · Esc pause / quit
+- **Settings:** M music · N SFX style · F auto-fire · G HDR Glow. HDR Glow defaults to on, remembers your choice and reports `UNAVAILABLE` on SDR-only displays.
 - **Replay view:** Esc exits the replay back to the title screen.
 - High scores are saved locally; enter your name on the board when you make the cut.
 - **Cheat:** press `#` for a free extra life — handy for testing, or for a relaxed, no‑pressure run.
@@ -103,7 +104,7 @@ Exploids is a hobby clone, not a product. For honest context, with the weak spot
 
 **Versus Maelstrom** — [Maelstrom](https://github.com/libsdl-org/Maelstrom) (Ambrosia, 1992; a GPL SDL port since 1995, today an SDL2/SDL3 build that runs on Apple Silicon) is the best-known still-maintained open-source Asteroids clone for the Mac, and the fairer yardstick: it already has power-ups, bonus objects and rich sound. Where Exploids actually differs:
 
-- **Rendering:** Exploids is real-time *vector* geometry drawn procedurally at high resolution and 120 Hz ProMotion; Maelstrom is bitmap / sprite raster art.
+- **Rendering:** Exploids is real-time *vector* geometry drawn procedurally at high resolution and 120 Hz ProMotion, with HDR/EDR neon glow on supported displays; Maelstrom is bitmap / sprite raster art.
 - **Audio:** Exploids synthesizes its sound effects live on the audio thread (only the two music tracks are files); Maelstrom plays sampled sound.
 - **Mechanics:** the rotating Mad Meteoroids mode, gravity wells and imploding asteroids are specific to Exploids.
 - **Stack:** native Swift 6 / SpriteKit / AppKit on Apple Silicon, versus a C/SDL port.

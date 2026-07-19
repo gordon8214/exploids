@@ -1,5 +1,7 @@
 import UIKit
 import SpriteKit
+import QuartzCore
+import Metal
 import GameCore
 
 /// Haupt-ViewController der iOS-App.
@@ -29,6 +31,10 @@ final class GameViewController: UIViewController {
     /// Zuletzt gesehener Demo-Status – ein Wechsel (Demo startet/endet) muss das Overlay ebenfalls
     /// neu aufbauen, damit die Controls im Demo-Modus aus- und danach wieder eingeblendet werden.
     private var lastKnownDemo: Bool = false
+
+    /// Das Float-Drawable wird pro SKView nur einmal aktiviert. Der EDR-Wunsch selbst kann danach
+    /// billig mit der Benutzereinstellung bzw. einem Displaywechsel an- und ausgeschaltet werden.
+    private var hdrSurfaceConfigured = false
 
     // MARK: - Lifecycle
 
@@ -80,8 +86,12 @@ final class GameViewController: UIViewController {
 
         // onQuit absichtlich NICHT setzen: iOS-Apps dürfen sich nicht selbst beenden (Apple HIG).
 
-        skView.presentScene(s)
         self.scene = s
+        s.onHDRGlowPreferenceChanged = { [weak self] _ in
+            self?.refreshHDRDisplay()
+        }
+        refreshHDRDisplay()
+        skView.presentScene(s)
     }
 
     /// Legt das Touch-Overlay als transparente Subview über den SKView.
@@ -108,6 +118,10 @@ final class GameViewController: UIViewController {
 
     /// Wird jeden Frame auf dem Main-Thread aufgerufen (CADisplayLink-Callback).
     @objc private func onDisplayLink() {
+        // UIScreen sendet für normalen Headroom-Wechsel (z. B. Helligkeit) keine Notification;
+        // deshalb direkt im ohnehin vorhandenen Render-Takt abfragen.
+        refreshHDRDisplay()
+
         let current = scene.gameState
         let demo = scene.isDemoRunning
         // Overlay nur aktualisieren, wenn sich State ODER Demo-Status geändert hat.
@@ -116,6 +130,38 @@ final class GameViewController: UIViewController {
         lastKnownDemo = demo
         overlay.update(for: current, demoActive: demo)
         updateKeyboard(for: current)
+    }
+
+    /// Bindet SpriteKits CAMetalLayer an den tatsächlich hostenden Bildschirm. Simulatoren und
+    /// SDR-Geräte bleiben im bisherigen Pfad; die gespeicherte Nutzerpräferenz wird nicht verändert.
+    private func refreshHDRDisplay() {
+        guard let scene else { return }
+        guard let metalLayer = skView.layer as? CAMetalLayer,
+              metalLayer.device != nil else {
+            scene.updateHDRDisplay(available: false, currentHeadroom: 1.0)
+            return
+        }
+        // Beim ersten Aufruf ist die View eventuell noch nicht am Fenster. Der Main-Screen erlaubt
+        // trotzdem die EDR-Konfiguration vor presentScene; danach gewinnt immer der echte Host-Screen.
+        let display = skView.window?.screen ?? UIScreen.main
+
+        let displaySupportsHDR = display.potentialEDRHeadroom > 1.0
+        if displaySupportsHDR && !hdrSurfaceConfigured,
+           let extendedColorSpace = CGColorSpace(name: CGColorSpace.extendedSRGB) {
+            // SpriteKits sRGB-Transferkurve für normale Farben beibehalten, den Farbraum aber als
+            // extended markieren, damit der Compositor Float-Werte oberhalb von 1 nicht abschneidet.
+            metalLayer.pixelFormat = .rgba16Float
+            metalLayer.colorspace = extendedColorSpace
+            metalLayer.edrMetadata = nil
+            hdrSurfaceConfigured = metalLayer.pixelFormat == .rgba16Float
+                && metalLayer.colorspace != nil
+        }
+
+        let available = displaySupportsHDR && hdrSurfaceConfigured
+        let enabled = available && scene.hdrGlowEnabled
+        metalLayer.wantsExtendedDynamicRangeContent = enabled
+        let headroom = enabled ? display.currentEDRHeadroom : 1.0
+        scene.updateHDRDisplay(available: available, currentHeadroom: headroom)
     }
 
     // MARK: - System-Tastatur für die Initialen-Eingabe

@@ -169,6 +169,7 @@ public final class Asteroid: SKShapeNode {
         self.fillColor = SKColor(white: 0.15, alpha: 0.8)
         self.lineWidth = 2.0
         self.lineJoin = .miter
+        VectorGlowRenderer.markStroke(self)
         
         // 2. Setup 3D Wireframe (perturbed icosahedron)
         let phi = (1.0 + sqrt(5.0)) / 2.0
@@ -220,6 +221,7 @@ public final class Asteroid: SKShapeNode {
         wireframeNode.fillColor = .clear
         wireframeNode.lineWidth = 1.5
         wireframeNode.lineJoin = .round
+        VectorGlowRenderer.markStroke(wireframeNode)
         if wireframeNode.parent == nil {
             self.addChild(wireframeNode)
         }

@@ -50,6 +50,7 @@ public final class GravityWell: SKShapeNode {
         self.strokeColor = .white
         self.fillColor = .black
         self.lineWidth = 2.0
+        VectorGlowRenderer.markStroke(self)
         
         // 2. Swirling spiral arms (influence boundary)
         let spiralPath = CGMutablePath()
@@ -80,6 +81,7 @@ public final class GravityWell: SKShapeNode {
         vortexNode.strokeColor = SKColor(red: 0.6, green: 0.1, blue: 1.0, alpha: 0.8)
         vortexNode.fillColor = .clear
         vortexNode.lineWidth = 1.5
+        VectorGlowRenderer.markStroke(vortexNode)
         self.addChild(vortexNode)
         
         // Setup initial fade-in animation

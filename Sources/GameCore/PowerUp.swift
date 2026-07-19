@@ -210,6 +210,7 @@ public final class PowerUp: SKShapeNode {
         self.strokeColor = strokeColor
         self.fillColor = fillColor
         self.lineWidth = 2.0
+        VectorGlowRenderer.markStroke(self)
         
         // Add centered letter label matching the outline color
         labelNode.text = type.rawValue

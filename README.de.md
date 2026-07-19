@@ -78,8 +78,9 @@ Neun Aufsammler, jeder mit eigenem Vektor-Symbol:
 
 ## Steuerung
 
-- **Startbildschirm:** ▲/▼ Spielmodus wechseln · ◀/▶ Startlevel wählen · Leertaste/Enter starten · D (oder 30 s Leerlauf) eine Autopilot-Demo ansehen · I Glossar · 1–5 ein Highscore-Replay ansehen
-- **Im Spiel:** Pfeiltasten / WASD zum Fliegen · Leertaste zum Schießen (halten zum Aufladen / Strahl sweepen) · M Musik an/aus · Esc Pause / Beenden
+- **Startbildschirm:** ▲/▼ Spielmodus wechseln · ◀/▶ Startlevel wählen · Leertaste/Enter starten · D (oder 30 s Leerlauf) eine Autopilot-Demo ansehen · I Glossar · O Einstellungen · 1–5 ein Highscore-Replay ansehen
+- **Im Spiel:** Pfeiltasten / WASD zum Fliegen · Leertaste zum Schießen (halten zum Aufladen / Strahl sweepen) · M Musik an/aus · G HDR-Glow an/aus · Esc Pause / Beenden
+- **Einstellungen:** M Musik · N SFX-Stil · F Auto-Feuer · G HDR-Glow. HDR-Glow ist standardmäßig aktiv, merkt sich die Auswahl und zeigt auf reinen SDR-Displays `UNAVAILABLE`.
 - **Replay-Ansicht:** Esc verlässt das Replay zurück zum Startbildschirm.
 - Highscores werden lokal gespeichert; bei einer Platzierung den Namen auf der Liste eintragen.
 - **Cheat:** Taste `#` gibt ein Extra‑Leben — praktisch zum Testen oder für einen entspannten Durchlauf ohne Herausforderung.
@@ -105,7 +106,7 @@ Exploids ist ein Hobby-Klon, kein Produkt. Zur ehrlichen Einordnung, Schwachstel
 
 **Gegenüber Maelstrom** — [Maelstrom](https://github.com/libsdl-org/Maelstrom) (Ambrosia, 1992; seit 1995 GPL-SDL-Port, heute ein SDL2/SDL3-Build, der auf Apple Silicon läuft) ist der bekannteste noch gepflegte Open-Source-Asteroids-Klon für den Mac und der fairere Maßstab: Power-Ups, Bonus-Objekte und satten Sound hat er bereits. Worin sich Exploids tatsächlich unterscheidet:
 
-- **Rendering:** Exploids ist prozedural gezeichnete Echtzeit-*Vektor*-Geometrie in hoher Auflösung und mit 120 Hz ProMotion; Maelstrom ist Bitmap-/Sprite-Rastergrafik.
+- **Rendering:** Exploids ist prozedural gezeichnete Echtzeit-*Vektor*-Geometrie in hoher Auflösung und mit 120 Hz ProMotion samt HDR-/EDR-Neonglühen auf unterstützten Displays; Maelstrom ist Bitmap-/Sprite-Rastergrafik.
 - **Audio:** Exploids synthetisiert die Soundeffekte live auf dem Audio-Thread (nur die zwei Musikstücke sind Dateien); Maelstrom spielt Samples ab.
 - **Mechaniken:** der rotierende Mad-Meteoroids-Modus, Gravitationsfelder und imploding-Asteroiden sind Exploids-spezifisch.
 - **Stack:** nativ Swift 6 / SpriteKit / AppKit auf Apple Silicon statt eines C/SDL-Ports.

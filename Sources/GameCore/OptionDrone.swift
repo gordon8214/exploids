@@ -18,6 +18,7 @@ final class OptionDrone: SKShapeNode {
         self.strokeColor = SKColor(red: 0.0, green: 0.9, blue: 1.0, alpha: 1.0)
         self.fillColor = SKColor(red: 0.0, green: 0.9, blue: 1.0, alpha: 0.1)
         self.lineWidth = 1.5
+        VectorGlowRenderer.markStroke(self)
     }
     
     required init?(coder aDecoder: NSCoder) {

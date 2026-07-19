@@ -115,6 +115,7 @@ public final class Laser: SKShapeNode {
         
         self.fillColor = .clear
         self.lineCap = .round
+        VectorGlowRenderer.markStroke(self)
     }
     
     // MARK: - Update

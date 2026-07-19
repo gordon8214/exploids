@@ -2,6 +2,22 @@
 
 All notable changes to Exploids. Dates are ISO 8601 (YYYY-MM-DD).
 
+## [0.15.0] — 2026-07-19
+
+**For players:**
+- Gameplay vectors now use HDR/EDR headroom on supported Mac, iPhone and iPad displays for bright
+  neon output without changing their line weight. Text, stars, touch controls and raster boss art
+  stay SDR.
+- A new persistent `HDR GLOW` setting defaults to on. Press `G` on Mac or use the fourth settings
+  button on iOS; unsupported displays report the option as unavailable and keep the legacy look.
+
+**Under the hood:**
+- SpriteKit shape shaders follow the current display headroom up to 3× SDR white, while GIF/video
+  replay export is explicitly pinned to SDR and the deterministic simulation/replay format is
+  unchanged.
+- Added float-render regression coverage for overbright output, exact SDR fallback, translucent
+  fills, vector-family opt-in and settings persistence.
+
 ## [0.14.4] — 2026-07-12
 
 First signed & notarized release since v0.13.0 — this DMG bundles everything from v0.14.0 through

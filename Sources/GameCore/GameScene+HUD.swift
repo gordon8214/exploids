@@ -38,7 +38,7 @@ extension GameScene {
         startPromptLabel.isHidden = true
         self.addChild(startPromptLabel)
         
-        instructionsLabel.text = "W/▲: THRUST   A/D/◀/▶: ROTATE   SPACE: FIRE (HOLD = AUTO)   I: GLOSSARY"
+        instructionsLabel.text = "W/▲: THRUST   A/D/◀/▶: ROTATE   SPACE: FIRE (HOLD = AUTO)   I: GLOSSARY   O: SETTINGS"
         instructionsLabel.fontSize = 14
         instructionsLabel.fontColor = .lightGray
         instructionsLabel.position = CGPoint(x: 0, y: -270)
@@ -97,6 +97,7 @@ extension GameScene {
         beamNode.blendMode = .add
         beamNode.zPosition = 50
         beamNode.isHidden = true
+        VectorGlowRenderer.markStroke(beamNode)
         self.addChild(beamNode)
 
         // Level Selection (Start Screen)
@@ -128,7 +129,8 @@ extension GameScene {
         self.addChild(settingsTitleLabel)
 
         let settingsRows: [(SKLabelNode, CGFloat)] = [
-            (settingsMusicLabel, 50), (settingsSfxLabel, 10), (settingsAutoFireLabel, -30)
+            (settingsMusicLabel, 70), (settingsSfxLabel, 25),
+            (settingsAutoFireLabel, -20), (settingsHDRGlowLabel, -65)
         ]
         for (label, y) in settingsRows {
             label.fontSize = 22
@@ -143,7 +145,7 @@ extension GameScene {
         settingsHintLabel.fontSize = 16
         settingsHintLabel.fontColor = .lightGray
         settingsHintLabel.horizontalAlignmentMode = .center
-        settingsHintLabel.position = CGPoint(x: 0, y: -110)
+        settingsHintLabel.position = CGPoint(x: 0, y: -125)
         settingsHintLabel.zPosition = 100
         settingsHintLabel.isHidden = true
         self.addChild(settingsHintLabel)
@@ -261,8 +263,8 @@ extension GameScene {
         glossaryStaticContainer.isHidden = true
         self.addChild(glossaryStaticContainer)
         
-        // Glossary prompt label on start screen
-        glossaryPromptLabel.text = "PRESS I FOR GLOSSARY"
+        // Deutlich sichtbare Einstiege in Glossar und Einstellungen auf dem macOS-Startbildschirm.
+        glossaryPromptLabel.text = "PRESS I FOR GLOSSARY   O FOR SETTINGS"
         glossaryPromptLabel.fontSize = 18
         glossaryPromptLabel.fontColor = .cyan
         glossaryPromptLabel.position = CGPoint(x: 0, y: -340)
@@ -451,13 +453,18 @@ extension GameScene {
         modeSelectionLabel.text = "MODE: \(modeName)\(hint)"
     }
 
-    /// Aktualisiert die drei Umschalt-Zeilen der Einstellungen mit dem aktuellen Stand.
+    /// Aktualisiert die vier Umschalt-Zeilen der Einstellungen mit dem aktuellen Stand.
     func updateSettingsLabels() {
         settingsMusicLabel.text = "MUSIC: \(MusicPlayer.shared.isEnabled ? "ON" : "OFF")"
         settingsSfxLabel.text = "SFX STYLE: \(SoundManager.shared.useSampledSFX ? "SAMPLE" : "PROCEDURAL")"
         settingsAutoFireLabel.text = "AUTO-FIRE: \(autoFire ? "ON" : "OFF")"
+        if isHDRGlowAvailable {
+            settingsHDRGlowLabel.text = "HDR GLOW: \(hdrGlowEnabled ? "ON" : "OFF")"
+        } else {
+            settingsHDRGlowLabel.text = "HDR GLOW: UNAVAILABLE"
+        }
         settingsHintLabel.text = isCompactLayout ? "TAP TO TOGGLE   X: BACK"
-                                                 : "M: MUSIC   N: SFX   F: AUTO-FIRE   ESC: BACK"
+                                                 : "M: MUSIC   N: SFX   F: AUTO-FIRE   G: HDR GLOW   ESC: BACK"
     }
 
     /// Aktualisiert die Extra-Leben-Anzeige (nur sichtbar, wenn welche vorhanden).

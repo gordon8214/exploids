@@ -383,7 +383,7 @@ final class TouchControlsView: UIView {
                             label: "LVL-", kind: .tap(keyCode: 123)),
                 TouchButton(id: 11, relativeRect: CGRect(x: 0.68, y: 0.49, width: 0.13, height: 0.15),
                             label: "LVL+", kind: .tap(keyCode: 124)),
-                // Obere Ecke links: Einstellungen öffnen (Musik / SFX-Stil / Auto-Feuer gebündelt).
+                // Obere Ecke links: Einstellungen öffnen (Musik / SFX / Auto-Feuer / HDR-Glow).
                 // „o" öffnet in der Scene den .settings-State.
                 TouchButton(id: 16, relativeRect: CGRect(x: 0.02, y: 0.06, width: 0.16, height: 0.16),
                             label: "SETTINGS", kind: .typeChar("o")),
@@ -445,17 +445,19 @@ final class TouchControlsView: UIView {
                             label: "✕", kind: .tap(keyCode: 53)),
             ]
 
-        // Einstellungen: drei Umschalt-Buttons (lösen dieselben globalen Toggles wie M/N/F aus)
+        // Einstellungen: vier Umschalt-Buttons (lösen dieselben globalen Toggles wie M/N/F/G aus)
         // plus Zurück. Die aktuellen Werte zeigt die Scene als Textzeilen darüber an.
         case .settings:
             return [
-                TouchButton(id: 140, relativeRect: CGRect(x: 0.10, y: 0.72, width: 0.22, height: 0.17),
+                TouchButton(id: 140, relativeRect: CGRect(x: 0.06, y: 0.72, width: 0.20, height: 0.17),
                             label: "MUSIC", kind: .typeChar("m")),
-                TouchButton(id: 141, relativeRect: CGRect(x: 0.39, y: 0.72, width: 0.22, height: 0.17),
+                TouchButton(id: 141, relativeRect: CGRect(x: 0.29, y: 0.72, width: 0.20, height: 0.17),
                             label: "SFX", kind: .typeChar("n")),
-                TouchButton(id: 142, relativeRect: CGRect(x: 0.68, y: 0.72, width: 0.22, height: 0.17),
+                TouchButton(id: 142, relativeRect: CGRect(x: 0.52, y: 0.72, width: 0.20, height: 0.17),
                             label: "AUTO-FIRE", kind: .typeChar("f")),
-                TouchButton(id: 143, relativeRect: CGRect(x: 0.88, y: 0.04, width: 0.10, height: 0.16),
+                TouchButton(id: 143, relativeRect: CGRect(x: 0.75, y: 0.72, width: 0.20, height: 0.17),
+                            label: "HDR GLOW", kind: .typeChar("g")),
+                TouchButton(id: 144, relativeRect: CGRect(x: 0.88, y: 0.04, width: 0.10, height: 0.16),
                             label: "✕", kind: .tap(keyCode: 53)),
             ]
         }

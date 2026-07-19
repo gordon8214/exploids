@@ -470,6 +470,7 @@ public final class SpaceCat: SKNode {
         dot.strokeColor = body
         dot.fillColor = .clear
         dot.lineWidth = 2.0
+        VectorGlowRenderer.markStroke(dot)
         addChild(dot)
         // Dummy-Sprites, damit flashEyes/updateFacing nicht crashen.
         catRight = SKSpriteNode(color: .clear, size: .zero)

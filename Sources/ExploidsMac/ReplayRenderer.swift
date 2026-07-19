@@ -81,6 +81,8 @@ enum ReplayRenderer {
         let simH = options.simHeight ?? replay.height
         let scene = GameScene(size: CGSize(width: simW, height: simH))
         scene.scaleMode = .fill
+        // Exportziele sind bewusst SDR (GIF/BGRA8 bzw. normales Video): keine Werte oberhalb von 1.
+        scene.updateHDRDisplay(available: false, currentHeadroom: 1.0)
         let view = SKView(frame: CGRect(x: 0, y: 0, width: simW, height: simH))
         view.presentScene(scene)
         if options.hideHUD { scene.setHUDHiddenForRender(true) }
@@ -150,6 +152,7 @@ enum ReplayRenderer {
         let simH = options.simHeight ?? replay.height
         let scene = GameScene(size: CGSize(width: simW, height: simH))
         scene.scaleMode = .fill
+        scene.updateHDRDisplay(available: false, currentHeadroom: 1.0)
         let view = SKView(frame: CGRect(x: 0, y: 0, width: simW, height: simH))
         view.presentScene(scene)
         if options.hideHUD { scene.setHUDHiddenForRender(true) }

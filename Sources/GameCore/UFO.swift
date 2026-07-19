@@ -89,6 +89,7 @@ public final class UFO: SKShapeNode {
         }
         self.lineWidth = 1.8
         self.lineJoin = .miter
+        VectorGlowRenderer.markStroke(self)
         
         // Initialize position completely off-screen
         let halfWidth = screenSize.width / 2

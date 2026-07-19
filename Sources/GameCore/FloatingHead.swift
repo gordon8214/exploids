@@ -354,6 +354,7 @@ public final class FloatingHead: SKNode {
         ring.strokeColor = eyeGlow
         ring.fillColor = .clear
         ring.lineWidth = 2
+        VectorGlowRenderer.markStroke(ring)
         art.addChild(ring)
         ring.run(.sequence([
             .group([.scale(to: 2.6, duration: 0.25), .fadeOut(withDuration: 0.25)]),
@@ -413,6 +414,7 @@ public final class FloatingHead: SKNode {
         circle.fillColor = SKColor(white: 0.06, alpha: 1.0)
         circle.strokeColor = stone
         circle.lineWidth = 3
+        VectorGlowRenderer.markStroke(circle)
         art.addChild(circle)
         leftSocketCenter = CGPoint(x: -collisionRadius * 0.35, y: collisionRadius * 0.2)
         rightSocketCenter = CGPoint(x: collisionRadius * 0.35, y: collisionRadius * 0.2)
@@ -437,6 +439,8 @@ public final class FloatingHead: SKNode {
         core.fillColor = pupilCol
         core.strokeColor = eyeGlow
         core.lineWidth = 1.0
+        VectorGlowRenderer.markStroke(core)
+        VectorGlowRenderer.markFill(core)
         halo.addChild(core)
         halo.position = center
         return halo
@@ -454,6 +458,7 @@ public final class FloatingHead: SKNode {
         node.lineWidth = 2.0
         node.lineJoin = .round
         node.fillColor = .clear
+        VectorGlowRenderer.markStroke(node)
         return node
     }
 }
