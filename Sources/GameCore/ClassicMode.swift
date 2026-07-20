@@ -402,6 +402,7 @@ extension GameScene {
                 classicSession.wave += 1
                 currentLevel = classicSession.wave
                 levelLabel.text = "WAVE: \(classicSession.wave)"
+                classicHUD.updateWave(classicSession.wave)
                 spawnClassicWave()
             }
         } else {

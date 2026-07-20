@@ -54,12 +54,15 @@ final class ClassicModeTests: GameCoreTestCase {
 
             XCTAssertEqual(scene.size, GameScene.classicLogicalArenaSize)
             XCTAssertEqual(scene.scaleMode, .aspectFit)
-            XCTAssertEqual(scene.levelLabel.position, CGPoint(x: -492, y: 319),
-                           "WAVE-HUD muss nach Eintritt aus \(viewSize) in der Classic-Arena liegen")
-            XCTAssertEqual(scene.livesLabel.position, CGPoint(x: -492, y: 294),
-                           "SHIPS-HUD muss nach Eintritt aus \(viewSize) in der Classic-Arena liegen")
-            XCTAssertFalse(scene.levelLabel.isHidden)
-            XCTAssertFalse(scene.livesLabel.isHidden)
+            XCTAssertEqual(scene.classicHUD.scoreNode.position, CGPoint(x: -412, y: 356))
+            XCTAssertEqual(scene.classicHUD.highScoreNode.position, CGPoint(x: 0, y: 366))
+            XCTAssertEqual(scene.classicHUD.waveNode.position, CGPoint(x: 412, y: 366))
+            XCTAssertEqual(scene.classicHUD.livesNode.position, CGPoint(x: -352, y: 340))
+            XCTAssertFalse(scene.classicHUD.isHidden)
+            XCTAssertTrue(scene.scoreLabel.isHidden)
+            XCTAssertTrue(scene.hiScoreLabel.isHidden)
+            XCTAssertTrue(scene.levelLabel.isHidden)
+            XCTAssertTrue(scene.livesLabel.isHidden)
 
             let origin = view.convert(.zero, from: scene)
             let horizontal = view.convert(CGPoint(x: 100, y: 0), from: scene)
@@ -78,7 +81,89 @@ final class ClassicModeTests: GameCoreTestCase {
             XCTAssertEqual(scene.scaleMode, .resizeFill)
             XCTAssertEqual(scene.size, resized,
                            "Nach Classic muss das Menü die aktuelle Host-Größe wieder übernehmen")
+            XCTAssertTrue(scene.classicHUD.isHidden)
         }
+    }
+
+    func testClassicHUDUsesVectorScoresWaveAndShipIcons() {
+        let (scene, view) = makeClassicScene(seed: 0x4D_55D)
+        _ = view
+
+        XCTAssertEqual(ClassicHUDNode.formattedScore(0), "00")
+        XCTAssertEqual(ClassicHUDNode.formattedScore(20), "20")
+        XCTAssertEqual(ClassicHUDNode.formattedScore(2_650), "2650")
+        XCTAssertEqual(scene.classicHUD.scoreNode.renderedText, "00")
+        XCTAssertEqual(
+            scene.classicHUD.highScoreNode.renderedText,
+            ClassicHUDNode.formattedScore(scene.highScores.first?.score ?? 0)
+        )
+        XCTAssertEqual(scene.classicHUD.waveNode.renderedText, "WAVE 1")
+        XCTAssertEqual(scene.classicHUD.shipsDisplayed, 3)
+        XCTAssertEqual(scene.classicHUD.lifeIconNodes.count, 3)
+
+        let textNodes = [
+            scene.classicHUD.scoreNode,
+            scene.classicHUD.highScoreNode,
+            scene.classicHUD.waveNode
+        ]
+        XCTAssertTrue(textNodes.allSatisfy { isOpaqueWhite($0.strokeColor) })
+        XCTAssertTrue(textNodes.allSatisfy(VectorGlowRenderer.isStrokeMarked))
+        XCTAssertTrue(scene.classicHUD.lifeIconNodes.allSatisfy {
+            isOpaqueWhite($0.strokeColor) && $0.fillColor.alphaComponent == 0
+        })
+        XCTAssertTrue(scene.classicHUD.lifeIconNodes.allSatisfy(VectorGlowRenderer.isStrokeMarked))
+
+        guard let scoreBounds = scene.classicHUD.scoreNode.path?.boundingBox,
+              let highScoreBounds = scene.classicHUD.highScoreNode.path?.boundingBox,
+              let lifeBounds = scene.classicHUD.lifeIconNodes.first?.path?.boundingBox else {
+            return XCTFail("Classic-HUD muss sichtbare Vektorpfade besitzen")
+        }
+        XCTAssertEqual(scene.classicHUD.scoreNode.position.y + scoreBounds.maxY, 380,
+                       accuracy: 0.000_001)
+        XCTAssertEqual(scene.classicHUD.highScoreNode.position.y + highScoreBounds.maxY, 380,
+                       accuracy: 0.000_001)
+        XCTAssertEqual(lifeBounds.width, 16, accuracy: 0.000_001)
+        XCTAssertEqual(lifeBounds.height, 24, accuracy: 0.000_001)
+        XCTAssertEqual(scene.classicHUD.lifeIconNodes[1].position.x
+                           - scene.classicHUD.lifeIconNodes[0].position.x,
+                       20, accuracy: 0.000_001)
+
+        scene.score = 2_650
+        XCTAssertEqual(scene.classicHUD.scoreNode.renderedText, "2650")
+        scene.score = 0
+        XCTAssertEqual(scene.classicHUD.scoreNode.renderedText, "00")
+
+        scene.classicHUD.updateHighScore(0)
+        XCTAssertEqual(scene.classicHUD.highScoreNode.renderedText, "00")
+        XCTAssertEqual(scene.classicHUD.highScoreNode.path?.boundingBox.midX ?? .nan, 0,
+                       accuracy: 0.000_001)
+    }
+
+    func testClassicHUDVisibilityFollowsGameStateAndRenderSuppression() {
+        let (scene, view) = makeClassicScene(seed: 0x51A7E)
+        _ = view
+        XCTAssertFalse(scene.classicHUD.isHidden)
+
+        scene.transitionTo(.quitConfirmation)
+        XCTAssertTrue(scene.classicHUD.isHidden)
+        scene.transitionTo(.playing)
+        XCTAssertFalse(scene.classicHUD.isHidden)
+        XCTAssertTrue(scene.scoreLabel.isHidden)
+        XCTAssertTrue(scene.hiScoreLabel.isHidden)
+
+        scene.setHUDHiddenForRender(true)
+        XCTAssertTrue(scene.classicHUD.isHidden)
+        scene.transitionTo(.quitConfirmation)
+        scene.transitionTo(.playing)
+        XCTAssertTrue(scene.classicHUD.isHidden,
+                      "Headless-HUD-Sperre muss auch einen Resume ueberleben")
+
+        scene.setHUDHiddenForRender(false)
+        scene.transitionTo(.quitConfirmation)
+        scene.transitionTo(.playing)
+        XCTAssertFalse(scene.classicHUD.isHidden)
+        scene.transitionTo(.gameOver)
+        XCTAssertTrue(scene.classicHUD.isHidden)
     }
 
     func testAncientAndMadKeepAdaptiveSceneSizing() {
@@ -92,6 +177,10 @@ final class ClassicModeTests: GameCoreTestCase {
 
             XCTAssertEqual(scene.scaleMode, .resizeFill)
             XCTAssertEqual(scene.size, viewport)
+            XCTAssertTrue(scene.classicHUD.isHidden)
+            XCTAssertFalse(scene.scoreLabel.isHidden)
+            XCTAssertFalse(scene.hiScoreLabel.isHidden)
+            XCTAssertFalse(scene.levelLabel.isHidden)
         }
     }
 
@@ -164,6 +253,7 @@ final class ClassicModeTests: GameCoreTestCase {
         XCTAssertTrue(scene.activeAsteroids.isEmpty)
         advance(scene, seconds: 0.05)
         XCTAssertEqual(scene.classicSession.wave, 2)
+        XCTAssertEqual(scene.classicHUD.waveNode.renderedText, "WAVE 2")
         XCTAssertEqual(scene.activeAsteroids.count, 6)
         XCTAssertEqual(scene.maxLevelReached, unlockedLevel,
                        "Classic-Wellen dürfen die Standard-Level-Freischaltung nicht verändern")
@@ -417,8 +507,10 @@ final class ClassicModeTests: GameCoreTestCase {
         _ = view
         scene.clearAllEntitiesForTesting()
         XCTAssertEqual(scene.classicSession.shipsRemaining, 3)
+        XCTAssertEqual(scene.classicHUD.lifeIconNodes.count, 3)
 
         scene.score = 9_990
+        XCTAssertEqual(scene.classicHUD.scoreNode.renderedText, "9990")
         let scoringRock = makeClassicAsteroid(.small, position: CGPoint(x: 260, y: 180))
         scene.addAsteroidForTesting(scoringRock)
         let scoringShot = Laser(position: scoringRock.position, angle: 0, type: .normal,
@@ -428,11 +520,14 @@ final class ClassicModeTests: GameCoreTestCase {
         scene.advanceOneStep()
         XCTAssertEqual(scene.score, 10_090)
         XCTAssertEqual(scene.classicSession.shipsRemaining, 4)
+        XCTAssertEqual(scene.classicHUD.scoreNode.renderedText, "10090")
+        XCTAssertEqual(scene.classicHUD.lifeIconNodes.count, 4)
 
         let blocker = makeClassicAsteroid(.small, position: .zero, velocity: .zero)
         scene.addAsteroidForTesting(blocker)
         scene.damageShipForTesting()
         XCTAssertEqual(scene.classicSession.shipsRemaining, 3)
+        XCTAssertEqual(scene.classicHUD.lifeIconNodes.count, 3)
         XCTAssertTrue(scene.ship.isHidden)
         advance(scene, seconds: ClassicTuning.respawnDelay + 0.1)
         XCTAssertTrue(scene.ship.isHidden, "Ein belegtes Zentrum muss den Respawn weiter verzögern")
@@ -450,6 +545,7 @@ final class ClassicModeTests: GameCoreTestCase {
         scene.advanceOneStep()
         XCTAssertTrue(scene.ship.isHidden, "Classic hat nach dem Respawn keine Unverwundbarkeit")
         XCTAssertEqual(scene.classicSession.shipsRemaining, 2)
+        XCTAssertEqual(scene.classicHUD.lifeIconNodes.count, 2)
         XCTAssertEqual(scene.score, scoreBeforeCollision + 100,
                        "Auch das Spielerschiff selbst kann im Arcade-Regelsatz Felsenpunkte erzielen")
     }
@@ -966,10 +1062,13 @@ final class ClassicModeTests: GameCoreTestCase {
         XCTAssertTrue(debris.allSatisfy { isOpaqueWhite($0.strokeColor) && $0.fillColor.alphaComponent == 0 })
         XCTAssertTrue(debris.allSatisfy(VectorGlowRenderer.isStrokeMarked))
 
-        // Hintergrund/HUD behalten ihre vorhandene Farbgebung.
+        // Standardlabels bleiben fuer Ancient/Mad konfiguriert; Classic zeigt stattdessen weisse Pfade.
         XCTAssertEqual(scene.scoreLabel.fontColor, .cyan)
         XCTAssertEqual(scene.hiScoreLabel.fontColor,
                        SKColor(red: 1.0, green: 0.75, blue: 0.0, alpha: 1.0))
+        XCTAssertTrue(scene.scoreLabel.isHidden)
+        XCTAssertTrue(scene.hiScoreLabel.isHidden)
+        XCTAssertTrue(isOpaqueWhite(scene.classicHUD.scoreNode.strokeColor))
         XCTAssertTrue(scene.children.compactMap { $0 as? SKSpriteNode }
             .filter { $0.zPosition == -10 }
             .contains { $0.color != SKColor.white })

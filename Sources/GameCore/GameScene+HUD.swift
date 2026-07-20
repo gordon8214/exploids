@@ -95,6 +95,10 @@ extension GameScene {
         livesLabel.isHidden = true
         self.addChild(livesLabel)
 
+        // Classic rendert Punktzahl, Highscore, Welle und Leben als eigene weisse Vektorpfade.
+        // Der Knoten bleibt in allen Menues und Standardmodi verborgen.
+        self.addChild(classicHUD)
+
         applyStandardHUDLayout()
 
         // Laserbeam-Visual (Polylinie, pro Frame neu aufgebaut; additives Leuchten)
@@ -505,11 +509,23 @@ extension GameScene {
                                                  : macHint
     }
 
+    /// Spiegelt den aktuellen Classic-Sitzungsstand in den rein visuellen HUD-Knoten. Die Methode
+    /// zieht weder Zufall noch Zeit und ist damit fuer Replay und Simulation folgenlos.
+    func refreshClassicHUD() {
+        guard gameMode == .classicAsteroids else { return }
+        classicHUD.update(
+            score: score,
+            highScore: highScores.first?.score ?? 0,
+            wave: classicSession.wave,
+            shipsRemaining: classicSession.shipsRemaining
+        )
+    }
+
     /// Aktualisiert die Extra-Leben-Anzeige (nur sichtbar, wenn welche vorhanden).
     func updateLivesLabel() {
-        if gameMode == .classicAsteroids && gameState == .playing {
-            livesLabel.text = "SHIPS: \(classicSession.shipsRemaining)"
-            livesLabel.isHidden = false
+        if gameMode == .classicAsteroids {
+            livesLabel.isHidden = true
+            refreshClassicHUD()
             return
         }
         if extraLives > 0 {

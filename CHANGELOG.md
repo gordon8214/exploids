@@ -2,6 +2,20 @@
 
 All notable changes to Exploids. Dates are ISO 8601 (YYYY-MM-DD).
 
+## [0.16.11] — 2026-07-20
+
+**For players:**
+- Classic now uses an Atari-inspired white vector HUD: the unlabelled player score sits at the
+  upper-left, remaining ships appear as upward-facing outlines beneath it, the high score is centered
+  and the wave counter occupies the upper-right.
+- Classic scores no longer show padded zeroes or modern text labels; a new game begins at `00`, as on
+  the original display. Ancient and Mad retain their existing coloured text HUDs.
+
+**Under the hood:**
+- The HUD uses small path-based glyphs and the existing Exploids ship outline, so it adds no font,
+  artwork or Atari coordinate-table asset. This presentation-only change leaves replay version 8 and
+  all simulation state unchanged.
+
 ## [0.16.10] — 2026-07-20
 
 **For players:**

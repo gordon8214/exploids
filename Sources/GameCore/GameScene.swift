@@ -180,11 +180,25 @@ public final class GameScene: SKScene {
         return gameState == .gameOver || gameState == .nameEntry
     }
     
-    /// The player's current score.
-    public internal(set) var score: Int = 0
+    /// The player's current score. Classic spiegelt jede Aenderung unmittelbar in sein eigenes
+    /// Vektor-HUD; die vorhandenen Moduspfade aktualisieren ihre Textlabels weiterhin wie bisher.
+    public internal(set) var score: Int = 0 {
+        didSet {
+            if gameMode == .classicAsteroids {
+                classicHUD.updateScore(score)
+            }
+        }
+    }
     
-    /// Persistent high scores.
-    public private(set) var highScores: [HighScore] = []
+    /// Persistent high scores. Classic haelt seine mittige Vektoranzeige auch dann aktuell, wenn
+    /// die aktive Bestenliste neu geladen, umgeschaltet oder nach einem Spiel ergaenzt wird.
+    public private(set) var highScores: [HighScore] = [] {
+        didSet {
+            if isClassicInterfaceActive {
+                classicHUD.updateHighScore(highScores.first?.score ?? 0)
+            }
+        }
+    }
     private var standardHighScores: [HighScore] = []
     private var classicHighScores: [HighScore] = []
     /// Persistenz für Highscores + maximal erreichtes Level (UserDefaults-Details ausgelagert).
@@ -556,6 +570,7 @@ public final class GameScene: SKScene {
     let timerLabel = SKLabelNode(fontNamed: "Courier-Bold")
     let levelLabel = SKLabelNode(fontNamed: "Courier")
     let livesLabel = SKLabelNode(fontNamed: "Courier")
+    let classicHUD = ClassicHUDNode()
     let levelSelectionLabel = SKLabelNode(fontNamed: "Courier-Bold")
     let modeSelectionLabel = SKLabelNode(fontNamed: "Courier-Bold")
     // Einstellungen-Ansicht: Titel + Umschalt-Zeilen + Bedien-Hinweis.
@@ -2701,6 +2716,7 @@ public final class GameScene: SKScene {
         timerLabel.isHidden = true
         levelLabel.isHidden = true
         livesLabel.isHidden = true
+        classicHUD.isHidden = true
         replayOverlayLabel.isHidden = true
     }
 
@@ -2763,6 +2779,7 @@ public final class GameScene: SKScene {
         timerLabel.isHidden = true
         levelLabel.isHidden = true
         livesLabel.isHidden = true
+        classicHUD.isHidden = true
         beamNode.isHidden = true
         levelSelectionLabel.isHidden = true
         modeSelectionLabel.isHidden = true
@@ -2863,10 +2880,15 @@ public final class GameScene: SKScene {
         case .playing:
             if previousState == .quitConfirmation {
                 // Resume game
-                scoreLabel.isHidden = false
-                hiScoreLabel.isHidden = false
-                timerLabel.isHidden = gameMode == .classicAsteroids
-                levelLabel.isHidden = false
+                if gameMode == .classicAsteroids {
+                    refreshClassicHUD()
+                    classicHUD.isHidden = false
+                } else {
+                    scoreLabel.isHidden = false
+                    hiScoreLabel.isHidden = false
+                    timerLabel.isHidden = false
+                    levelLabel.isHidden = false
+                }
                 
                 if isLevelClearing {
                     levelClearedLabel.isHidden = false
@@ -2990,8 +3012,9 @@ public final class GameScene: SKScene {
                 let currentHi = highScores.first?.score ?? 0
                 hiScoreLabel.text = "HI-SCORE: \(String(format: "%05d", currentHi))"
                 
-                scoreLabel.isHidden = false
-                hiScoreLabel.isHidden = false
+                let usesClassicHUD = gameMode == .classicAsteroids
+                scoreLabel.isHidden = usesClassicHUD
+                hiScoreLabel.isHidden = usesClassicHUD
                 
                 if gameMode == .classicAsteroids {
                     timerLabel.text = ""
@@ -3003,11 +3026,13 @@ public final class GameScene: SKScene {
                     timerLabel.text = "TIME: 01:00"
                     levelLabel.text = "LEVEL: \(currentLevel)"
                 }
-                timerLabel.isHidden = gameMode == .classicAsteroids
-                levelLabel.isHidden = false
+                timerLabel.isHidden = usesClassicHUD
+                levelLabel.isHidden = usesClassicHUD
                 
                 if gameMode == .classicAsteroids {
                     initializeClassicSession()
+                    refreshClassicHUD()
+                    classicHUD.isHidden = false
                 } else {
                     // Spawn initial asteroids
                     let initialCount = max(3, currentConfig().maxAsteroids / 2)

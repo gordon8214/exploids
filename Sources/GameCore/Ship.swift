@@ -25,13 +25,16 @@ public final class Ship: SKShapeNode {
     /// A value of 0.85 means the velocity decays by 15% every second.
     public var frictionDecayRate: CGFloat = 0.85
     
-    /// The local vertices defining the ship's outline shape.
-    public let vertices: [CGPoint] = [
+    /// Gemeinsame lokale Kontur fuer das aktive Schiff und die kleinen Classic-Lebenssymbole.
+    static let outlineVertices: [CGPoint] = [
         CGPoint(x: 18, y: 0),
         CGPoint(x: -12, y: 10),
         CGPoint(x: -8, y: 0),
         CGPoint(x: -12, y: -10)
     ]
+
+    /// The local vertices defining the ship's outline shape.
+    public let vertices = Ship.outlineVertices
     
     /// The flame node visual effect at the rear of the ship.
     private let flameNode = SKShapeNode()
