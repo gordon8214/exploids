@@ -20,7 +20,7 @@ public final class UFO: SKShapeNode {
     /// Internes Classic-Profil; die öffentlichen Initializer bleiben unverändert.
     private(set) var usesClassicBehavior = false
     var classicNextCourseChange: TimeInterval = 0.0
-    private var classicLastFireTime: TimeInterval = -1.0
+    private var classicNextFireTime: TimeInterval = .infinity
     
     // Bewegungs-Parameter: leichtes seitliches Schlingern + sanfte Verfolgung des Spielers.
     private var wavyTime: TimeInterval = 0.0
@@ -212,15 +212,25 @@ public final class UFO: SKShapeNode {
         let horizontalSpeed: CGFloat = isSmall ? 165.0 : 115.0
         velocity = CGPoint(x: startOnLeft ? horizontalSpeed : -horizontalSpeed, y: 0.0)
         classicNextCourseChange = currentTime + 2.13
-        classicLastFireTime = currentTime - 1.0
+        classicNextFireTime = currentTime + ClassicTuning.saucerHoldFireDuration
         VectorGlowRenderer.markStroke(self)
+    }
+
+    /// Verschiebt die Classic-Schussfreigabe nur nach hinten. So kann ein Respawn eine noch
+    /// laufende Eintrittsfrist niemals versehentlich verkürzen.
+    func postponeClassicFire(until nextEligibleFireTime: TimeInterval) {
+        guard usesClassicBehavior else { return }
+        classicNextFireTime = max(classicNextFireTime, nextEligibleFireTime)
     }
 
     /// Classic-Saucer-Schuss: große Untertasse zufällig, kleine mit ab 35.000 Punkten engerem Fehler.
     func shootClassic(target: CGPoint, score: Int, currentTime: TimeInterval,
                       using rng: inout GameRandom) -> Laser? {
-        guard usesClassicBehavior, currentTime - classicLastFireTime >= 0.67 else { return nil }
-        classicLastFireTime = currentTime
+        // Wiederholtes Addieren des 1/120-s-Schritts kann wenige ULP unter der mathematischen
+        // Deadline landen. Die winzige Toleranz korrigiert nur diesen Rundungsfehler; ein ganzer
+        // Simulationsschritt vor der Frist bleibt um Größenordnungen zu früh.
+        guard usesClassicBehavior, currentTime + 1e-9 >= classicNextFireTime else { return nil }
+        classicNextFireTime = currentTime + 0.67
 
         let angle: CGFloat
         if isSmall {

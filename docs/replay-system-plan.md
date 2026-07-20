@@ -29,6 +29,12 @@ Hänger deckeln die App-Hosts über `maxFrameDelta` (0.25 s); Tests lassen ihn a
 `.infinity`), um per großem `update(_:)`-Sprung deterministisch vorzuspulen. 93 Tests grün;
 **Spielgefühl über Playtest abzunehmen.**
 
+**Umsetzungsnotiz Logik-Version 4 (v0.16.5):** Classic-Untertassen warten beim Eintritt und nach
+dem Wiedererscheinen des Spielerschiffs 1,2 Sekunden bis zum nächsten Schuss. Weil sich dadurch
+Zeitpunkt und Reihenfolge gameplay-relevanter RNG-Ziehungen ändern, werden v3-Classic-Aufnahmen
+abgelehnt. Ancient/Mad änderten sich nicht und dürfen ihre v3-Aufnahmen weiterhin bitgenau abspielen;
+das gespeicherte Fixed-Timestep-Datenformat selbst bleibt unverändert.
+
 **Umsetzungsnotiz Phase 1 (erledigt):** PRNG `GameRandom` (SplitMix64) eingeführt; alle
 gameplay-relevanten `.random`-Aufrufe ziehen aus einem pro Lauf geseedeten `rng` (Entities über
 `init(..., using rng:)` + Convenience-Init für Tests). Zeit vereinheitlicht auf akkumulierte
@@ -76,7 +82,8 @@ sondern darin, die Simulation vollständig **deterministisch** zu machen.
   Tastenereignisse `[(frameIndex, keyCode, isDown)]`. In Phase 2 zusätzlich die `dt`-Folge; ab
   Phase 3 (Fixed-Timestep) entfällt die `dt`-Folge.
 - **Versionsbindung:** Jede Aufnahme trägt das Logik-Versions-Tag. Beim Abspielen wird ein Mismatch
-  erkannt und das Replay abgelehnt (Logikänderung macht alte Aufnahmen ungültig).
+  grundsätzlich abgelehnt; eine ältere Version bleibt nur nach expliziter, modusspezifischer
+  Kompatibilitätsentscheidung zugelassen (aktuell v3 für unveränderte Ancient-/Mad-Läufe).
 - **Audio bleibt außen vor:** Sound wird beim Replay aus Spielereignissen neu getriggert, nicht
   aufgezeichnet. Audio-Zufall (SoundManager) muss daher nicht geseedet werden.
 

@@ -2,6 +2,20 @@
 
 All notable changes to Exploids. Dates are ISO 8601 (YYYY-MM-DD).
 
+## [0.16.5] — 2026-07-19
+
+**For players:**
+- Classic saucers now wait 1.2 seconds before their first shot and after the player's ship
+  reappears from a destroyed state or successful hyperspace. This follows the fairer original Atari
+  [Rev. 2 timing](https://www.computerarcheology.com/Arcade/Asteroids/Code.html#6C34) instead of the
+  [later difficulty ROM's immediate-fire behavior](https://github.com/mamedev/mame/blob/master/src/mame/atari/asteroid.cpp#L17-L24),
+  while leaving the ship fully vulnerable to rocks, collisions and already-flying shots.
+
+**Under the hood:**
+- Replay logic is now version 4 because the delayed Classic shots move deterministic RNG draws.
+  Version 3 Ancient/Mad recordings remain compatible; version 3 Classic recordings are rejected
+  rather than replaying with simulation drift.
+
 ## [0.16.4] — 2026-07-19
 
 **For players:**

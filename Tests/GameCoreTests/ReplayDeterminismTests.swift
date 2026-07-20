@@ -218,13 +218,59 @@ final class ReplayDeterminismTests: GameCoreTestCase {
         XCTAssertLessThan(data.count, 8000, "Eine kurze Aufnahme sollte wenige KB groß sein (war \(data.count) B)")
     }
 
-    /// Versions-Tag: eine Aufnahme mit fremdem version-Tag gilt als inkompatibel.
+    /// Versions-Tag: v3 bleibt nur für die von v4 unveränderten Ancient-/Mad-Modi kompatibel.
     func testReplayVersionCompatibility() {
         let ok = Replay(seed: 1, startLevel: 1, gameMode: .ancientAsteroids, events: [], frameCount: 0)
         XCTAssertTrue(ok.isCompatible)
-        let stale = Replay(version: Replay.currentLogicVersion + 1, seed: 1, startLevel: 1,
-                           gameMode: .ancientAsteroids, events: [], frameCount: 0)
-        XCTAssertFalse(stale.isCompatible, "Fremdes version-Tag muss als inkompatibel erkannt werden")
+        let legacyAncient = Replay(version: 3, seed: 1, startLevel: 1,
+                                   gameMode: .ancientAsteroids, events: [], frameCount: 0)
+        let legacyMad = Replay(version: 3, seed: 1, startLevel: 1,
+                               gameMode: .madMeteoroids, events: [], frameCount: 0)
+        let legacyClassic = Replay(version: 3, seed: 1, startLevel: 1,
+                                   gameMode: .classicAsteroids, events: [], frameCount: 0)
+        XCTAssertTrue(legacyAncient.isCompatible)
+        XCTAssertTrue(legacyMad.isCompatible)
+        XCTAssertFalse(legacyClassic.isCompatible)
+
+        for version in [2, Replay.currentLogicVersion + 1] {
+            let incompatible = Replay(version: version, seed: 1, startLevel: 1,
+                                      gameMode: .ancientAsteroids, events: [], frameCount: 0)
+            XCTAssertFalse(incompatible.isCompatible,
+                           "Nicht freigegebene Logik-Versionen müssen inkompatibel bleiben")
+        }
+    }
+
+    func testStartReplayAcceptsVersionThreeStandardButRejectsVersionThreeClassic() {
+        let standardScene = GameScene(size: CGSize(width: 1000, height: 800))
+        let standardView = SKView(frame: CGRect(x: 0, y: 0, width: 1000, height: 800))
+        standardView.presentScene(standardScene)
+        let standard = Replay(version: 3, seed: 1, startLevel: 1,
+                              gameMode: .ancientAsteroids, events: [], frameCount: 1)
+        XCTAssertTrue(standardScene.startReplay(standard))
+
+        let classicScene = GameScene(size: CGSize(width: 1000, height: 800))
+        let classicView = SKView(frame: CGRect(x: 0, y: 0, width: 1000, height: 800))
+        classicView.presentScene(classicScene)
+        let classic = Replay(version: 3, seed: 1, startLevel: 1,
+                             gameMode: .classicAsteroids, events: [], frameCount: 1)
+        XCTAssertFalse(classicScene.startReplay(classic))
+        XCTAssertFalse(classicScene.isReplaying)
+    }
+
+    func testReplayDrivenRestartKeepsRecordedSeed() {
+        let scene = GameScene(size: CGSize(width: 1000, height: 800))
+        let view = SKView(frame: CGRect(x: 0, y: 0, width: 1000, height: 800))
+        view.presentScene(scene)
+        let replay = Replay(seed: 0x5EED, startLevel: 1, gameMode: .classicAsteroids,
+                            events: [], frameCount: 10)
+
+        XCTAssertTrue(scene.startReplay(replay))
+        scene.transitionTo(.gameOver)
+        scene.injectReplayInput(keyCode: 49, isDown: true)
+
+        XCTAssertEqual(scene.gameState, .playing)
+        XCTAssertEqual(scene.currentSeed, replay.seed,
+                       "Auch ein durch Replay-Eingabe ausgelöster Neustart muss deterministisch bleiben")
     }
 
     // MARK: - Aufnahme → Wiedergabe (Phase 2.2 + 2.3)
@@ -354,8 +400,9 @@ final class ReplayDeterminismTests: GameCoreTestCase {
 
         // Ein paar Frames spielen (Aufnahme läuft mit).
         driveNoThrustScript(scene, frames: 50, base: 1000.0)
-        // Score hochsetzen, damit der Lauf garantiert ein Highscore ist (unabhängig von vorhandenen).
-        scene.addScoreForTesting(99999)
+        // Score über den tatsächlich geladenen Spitzenwert setzen, damit lokale Test-Defaults den
+        // End-to-End-Pfad nicht davon abhängig machen, ob 99.999 Punkte bereits übertroffen wurden.
+        scene.addScoreForTesting((scene.highScores.first?.score ?? 0) + 1)
 
         // Game Over erzwingen (Schiff hat weder Schild noch Extra-Leben → Game Over).
         var guardCount = 0

@@ -2877,7 +2877,11 @@ public final class GameScene: SKScene {
                 // Seed für diesen Lauf festlegen: injizierten Seed übernehmen (Replay/Test) oder
                 // einmalig einen neuen aus dem System-RNG würfeln. Danach speist sich ALLE
                 // Spiel-Logik aus `rng` (deterministisch reproduzierbar bei gleichem Seed).
-                currentSeed = pendingSeed ?? UInt64.random(in: UInt64.min...UInt64.max)
+                // Falls eine Wiedergabe durch geänderte Logik früher Game Over erreicht, kann ein
+                // später aufgezeichneter Space-Impuls als Neustart interpretiert werden. Auch dieser
+                // Abweichungspfad muss reproduzierbar bleiben und verwendet daher weiter den Replay-Seed.
+                currentSeed = pendingSeed ?? replayPlayer?.replay.seed
+                    ?? UInt64.random(in: UInt64.min...UInt64.max)
                 pendingSeed = nil
                 rng = GameRandom(seed: currentSeed)
 

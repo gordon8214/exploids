@@ -37,7 +37,10 @@ public struct Replay: Codable, Equatable, Sendable {
     ///     hängt ein Lauf nur noch an (Seed + Eingaben) – die `dt`-Folge entfällt; gespeichert wird
     ///     nur die Anzahl der Simulationsschritte (`frameCount`). v2-Aufnahmen (variabler Zeitschritt)
     ///     sind damit inkompatibel und werden beim Abspielen abgelehnt.
-    public static let currentLogicVersion: Int = 3
+    /// v4: Classic-Untertassen warten beim Eintritt und nach dem Wiedererscheinen des Schiffs. Das
+    ///     verschiebt RNG-Ziehungen und macht v3-Classic-Läufe inkompatibel; Ancient/Mad v3 bleiben
+    ///     bitgleich und werden deshalb weiterhin angenommen.
+    public static let currentLogicVersion: Int = 4
 
     public let version: Int
     public let seed: UInt64
@@ -81,7 +84,7 @@ public struct Replay: Codable, Equatable, Sendable {
 
     // `dtSequence` bleibt nur als Legacy-Decodier-Schlüssel: alte v2-Aufnahmen tragen statt
     // `frameCount` noch die dt-Folge. Daraus leiten wir die Schrittzahl ab, damit das Dekodieren
-    // nicht wirft – die Aufnahme wird dann ohnehin über `isCompatible` (v3) abgelehnt.
+    // nicht wirft – die Aufnahme wird dann ohnehin über `isCompatible` abgelehnt.
     private enum CodingKeys: String, CodingKey {
         case version, seed, startLevel, gameMode, events, frameCount, autoFire, width, height, dtSequence
     }
@@ -105,7 +108,7 @@ public struct Replay: Codable, Equatable, Sendable {
         self.height = try c.decodeIfPresent(Int.self, forKey: .height) ?? 768
     }
 
-    /// Schreibt die kompakte v3-Form (ohne dt-Folge, mit Aufnahme-Größe).
+    /// Schreibt die kompakte Fixed-Timestep-Form (ohne dt-Folge, mit Aufnahme-Größe).
     public func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encode(version, forKey: .version)
@@ -119,9 +122,19 @@ public struct Replay: Codable, Equatable, Sendable {
         try c.encode(height, forKey: .height)
     }
 
-    /// Stimmt die Aufnahme mit der aktuellen Spiel-Logik überein? Bei `false` darf sie nicht
-    /// abgespielt werden (würde auseinanderdriften).
-    public var isCompatible: Bool { version == Replay.currentLogicVersion }
+    /// Stimmt die Aufnahme mit der aktuellen Spiel-Logik überein? v3 bleibt für Ancient/Mad
+    /// kompatibel, weil v4 ausschließlich Classic-Timing ändert. Classic v3 würde durch die
+    /// verschobenen Untertassen-RNG-Ziehungen driften und wird klar abgelehnt.
+    public var isCompatible: Bool {
+        if version == Replay.currentLogicVersion { return true }
+        guard version == 3 else { return false }
+        switch gameMode {
+        case .ancientAsteroids, .madMeteoroids:
+            return true
+        case .classicAsteroids:
+            return false
+        }
+    }
 
     // MARK: - Kompakte Kodierung (Binär-Property-List)
 

@@ -9,6 +9,9 @@ enum ClassicTuning {
     static let playerShotLifetime: TimeInterval = 0.8
     static let playerShotSpeed: CGFloat = 480.0
     static let safeRespawnRadius: CGFloat = 105.0
+    /// Atari Rev. 2 setzte den ersten Untertassen-Schusszähler auf 18 und wertete ihn nur jeden
+    /// vierten 60-Hz-Frame aus: 18 * 4 / 60 = 1,2 Sekunden Reaktionszeit.
+    static let saucerHoldFireDuration: TimeInterval = 18.0 * 4.0 / 60.0
 
     static func largeAsteroidCount(for wave: Int) -> Int {
         switch wave {
@@ -216,6 +219,7 @@ extension GameScene {
             if destroysShip {
                 loseClassicShip(cause: .hyperspaceMalfunction, allowHiddenHyperspaceFailure: true)
             } else {
+                postponeClassicSaucerFire(after: currentTime)
                 ship.velocity = .zero
                 ship.isHidden = false
                 ship.alpha = 1.0
@@ -232,8 +236,19 @@ extension GameScene {
             ship.velocity = .zero
             ship.zRotation = 0.0
             ship.alpha = 1.0
+            postponeClassicSaucerFire(after: currentTime)
             ship.isHidden = false
             classicSession.shipPhase = .active
+        }
+    }
+
+    /// Ein verstecktes Schiff darf die Schussfrist nicht unbemerkt verbrauchen. Beim Wiedererscheinen
+    /// bekommt es dieselbe kurze Vorwarnung wie beim Eintritt einer neuen Untertasse; Kollisionen und
+    /// bereits fliegende Geschosse bleiben davon bewusst unberührt.
+    private func postponeClassicSaucerFire(after currentTime: TimeInterval) {
+        let nextEligibleFireTime = currentTime + ClassicTuning.saucerHoldFireDuration
+        for ufo in activeUFOs {
+            ufo.postponeClassicFire(until: nextEligibleFireTime)
         }
     }
 

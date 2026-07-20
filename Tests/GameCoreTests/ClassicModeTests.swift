@@ -236,6 +236,100 @@ final class ClassicModeTests: GameCoreTestCase {
                        "Auch das Spielerschiff selbst kann im Arcade-Regelsatz Felsenpunkte erzielen")
     }
 
+    func testClassicSmallSaucerWaitsBeforeFirstShotAcrossSceneSizes() {
+        let cases: [(size: CGSize, seed: UInt64)] = [
+            (CGSize(width: 1024, height: 768), 0x51),
+            (CGSize(width: 1728, height: 1084), 0x52)
+        ]
+
+        for testCase in cases {
+            var rng = GameRandom(seed: testCase.seed)
+            let saucer = UFO(isSmall: true, startOnLeft: true,
+                              screenSize: testCase.size, using: &rng)
+            let startTime = 10.0
+            saucer.applyClassicBehavior(startOnLeft: true, currentTime: startTime)
+
+            XCTAssertNil(saucer.shootClassic(target: .zero, score: 35_000,
+                                              currentTime: startTime, using: &rng))
+            XCTAssertNil(saucer.shootClassic(
+                target: .zero,
+                score: 35_000,
+                currentTime: startTime + ClassicTuning.saucerHoldFireDuration - GameScene.simStep,
+                using: &rng
+            ))
+
+            let firstFireTime = startTime + ClassicTuning.saucerHoldFireDuration
+            XCTAssertNotNil(saucer.shootClassic(target: .zero, score: 35_000,
+                                                 currentTime: firstFireTime, using: &rng))
+            XCTAssertNil(saucer.shootClassic(target: .zero, score: 35_000,
+                                              currentTime: firstFireTime + 0.67 - GameScene.simStep,
+                                              using: &rng))
+            XCTAssertNotNil(saucer.shootClassic(target: .zero, score: 35_000,
+                                                 currentTime: firstFireTime + 0.67, using: &rng))
+        }
+    }
+
+    func testClassicRespawnPostponesReadySaucerWithoutInvulnerability() {
+        let (scene, view) = makeClassicScene(seed: 145)
+        _ = view
+        scene.clearAllEntitiesForTesting()
+        scene.addAsteroidForTesting(makeClassicAsteroid(
+            .small,
+            position: CGPoint(x: 400, y: 300),
+            velocity: .zero
+        ))
+        _ = addReadyClassicSmallSaucer(to: scene)
+
+        scene.damageShipForTesting()
+        advanceUntilShipVisible(
+            scene,
+            maximumSteps: Int(ceil(ClassicTuning.respawnDelay / GameScene.simStep)) + 2
+        )
+
+        XCTAssertFalse(scene.ship.isHidden)
+        XCTAssertTrue(scene.activeLasers.filter { $0.type != .normal }.isEmpty,
+                      "Die Untertasse darf nicht im Respawn-Schritt feuern")
+
+        let holdFireSteps = Int((ClassicTuning.saucerHoldFireDuration / GameScene.simStep).rounded())
+        advance(scene, steps: holdFireSteps - 1)
+        XCTAssertTrue(scene.activeLasers.filter { $0.type != .normal }.isEmpty)
+        advance(scene, steps: 1)
+        XCTAssertEqual(scene.activeLasers.filter { $0.type != .normal }.count, 1)
+    }
+
+    func testClassicSuccessfulHyperspacePostponesReadySaucer() {
+        let (scene, view) = makeClassicScene(seed: 146)
+        _ = view
+        scene.clearAllEntitiesForTesting()
+        addFarClassicAsteroids(26, to: scene)
+        let saucer = addReadyClassicSmallSaucer(to: scene)
+        scene.rng = GameRandom(seed: hyperspaceFailureSeed())
+
+        scene.simulateKeyDown(keyCode: 4)
+        advanceUntilShipVisible(
+            scene,
+            maximumSteps: Int(ceil(ClassicTuning.hyperspaceDelay / GameScene.simStep)) + 2
+        )
+
+        XCTAssertFalse(scene.ship.isHidden, "26 Felsen machen diesen Quell-Risikowert sicher")
+        XCTAssertTrue(scene.activeLasers.filter { $0.type != .normal }.isEmpty,
+                      "Die Untertasse darf nicht im Hyperraum-Rückkehrschritt feuern")
+
+        // Die 26 Felsen bestimmen nur das Hyperraum-Risiko. Danach entfernen wir sie,
+        // damit ein erneuter Schiffstreffer nicht die Feuerzeit-Prüfung verfälscht.
+        scene.activeAsteroids.forEach { $0.removeFromParent() }
+        scene.activeAsteroids.removeAll()
+        scene.ship.position = .zero
+        saucer.position = CGPoint(x: -300, y: 220)
+        saucer.velocity = .zero
+
+        let holdFireSteps = Int((ClassicTuning.saucerHoldFireDuration / GameScene.simStep).rounded())
+        advance(scene, steps: holdFireSteps - 1)
+        XCTAssertTrue(scene.activeLasers.filter { $0.type != .normal }.isEmpty)
+        advance(scene, steps: 1)
+        XCTAssertEqual(scene.activeLasers.filter { $0.type != .normal }.count, 1)
+    }
+
     func testClassicShipCollisionsAwardRockAndSaucerPoints() {
         let (scene, view) = makeClassicScene(seed: 141)
         _ = view
@@ -337,7 +431,7 @@ final class ClassicModeTests: GameCoreTestCase {
         scene.advanceOneStep()
 
         let replay = scene.currentReplayForTesting()
-        XCTAssertEqual(Replay.currentLogicVersion, 3)
+        XCTAssertEqual(Replay.currentLogicVersion, 4)
         XCTAssertEqual(replay?.gameMode.rawValue, 2)
         XCTAssertEqual(replay?.startLevel, 1)
         XCTAssertEqual(replay?.autoFire, false)
@@ -367,9 +461,11 @@ final class ClassicModeTests: GameCoreTestCase {
         highAim.applyClassicBehavior(startOnLeft: true, currentTime: 0)
         let target = CGPoint(x: 400, y: 140)
         let ideal = atan2(target.y, target.x)
-        let lowShot = lowAim.shootClassic(target: target, score: 0, currentTime: 1, using: &lowRNG)
+        let firstFireTime = ClassicTuning.saucerHoldFireDuration
+        let lowShot = lowAim.shootClassic(target: target, score: 0,
+                                          currentTime: firstFireTime, using: &lowRNG)
         let highShot = highAim.shootClassic(target: target, score: 35_000,
-                                            currentTime: 1, using: &highRNG)
+                                            currentTime: firstFireTime, using: &highRNG)
         XCTAssertLessThanOrEqual(abs(normalizedAngle((highShot?.zRotation ?? 0) - ideal)),
                                  abs(normalizedAngle((lowShot?.zRotation ?? 0) - ideal)) + 0.0001)
 
@@ -422,7 +518,10 @@ final class ClassicModeTests: GameCoreTestCase {
         var firingRNG = GameRandom(seed: 11)
         let firingSaucer = UFO(isSmall: false, startOnLeft: true,
                                screenSize: arenaSize, using: &firingRNG)
-        firingSaucer.applyClassicBehavior(startOnLeft: true, currentTime: scene.gameTime)
+        firingSaucer.applyClassicBehavior(
+            startOnLeft: true,
+            currentTime: scene.classicSession.elapsedTime - ClassicTuning.saucerHoldFireDuration
+        )
         firingSaucer.position = CGPoint(x: -300, y: 250)
         scene.addChild(firingSaucer)
         scene.activeUFOs.append(firingSaucer)
@@ -530,7 +629,9 @@ final class ClassicModeTests: GameCoreTestCase {
         XCTAssertTrue(VectorGlowRenderer.isStrokeMarked(saucer))
         var shotRNG = GameRandom(seed: 44)
         let enemyShot = saucer.shootClassic(target: scene.ship.position, score: 0,
-                                            currentTime: scene.gameTime + 1, using: &shotRNG)
+                                            currentTime: scene.classicSession.elapsedTime
+                                                + ClassicTuning.saucerHoldFireDuration,
+                                            using: &shotRNG)
         XCTAssertTrue(enemyShot.map { isOpaqueWhite($0.strokeColor) } == true)
         XCTAssertTrue(enemyShot.map(VectorGlowRenderer.isStrokeMarked) == true)
 
@@ -587,8 +688,31 @@ final class ClassicModeTests: GameCoreTestCase {
         }
     }
 
+    @discardableResult
+    private func addReadyClassicSmallSaucer(to scene: GameScene) -> UFO {
+        var saucerRNG = GameRandom(seed: 0x5A0CE2)
+        let saucer = UFO(isSmall: true, startOnLeft: true,
+                          screenSize: scene.size, using: &saucerRNG)
+        saucer.applyClassicBehavior(
+            startOnLeft: true,
+            currentTime: scene.classicSession.elapsedTime - ClassicTuning.saucerHoldFireDuration
+        )
+        saucer.classicNextCourseChange = .greatestFiniteMagnitude
+        saucer.position = CGPoint(x: -300, y: 220)
+        saucer.velocity = .zero
+        scene.addChild(saucer)
+        scene.activeUFOs.append(saucer)
+        return saucer
+    }
+
     private func advance(_ scene: GameScene, seconds: TimeInterval) {
         advance(scene, steps: Int(ceil(seconds / GameScene.simStep)))
+    }
+
+    private func advanceUntilShipVisible(_ scene: GameScene, maximumSteps: Int) {
+        for _ in 0..<maximumSteps where scene.ship.isHidden {
+            scene.advanceOneStep()
+        }
     }
 
     private func advance(_ scene: GameScene, steps: Int) {
