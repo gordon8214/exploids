@@ -2,6 +2,19 @@
 
 All notable changes to Exploids. Dates are ISO 8601 (YYYY-MM-DD).
 
+## [0.16.4] — 2026-07-19
+
+**For players:**
+- macOS settings now show a persistent `FULL SCREEN` option. Native full screen can be toggled with
+  Control-Command-F or the green window button; successful changes are restored on the next launch,
+  while new installations continue to start windowed.
+- During full-screen gameplay the mouse cursor is hidden. It returns immediately in menus and
+  pauses, when leaving full screen, or when Exploids loses focus.
+
+**Under the hood:**
+- Native AppKit transition callbacks are the source of truth for persistence, including failed
+  transition reconciliation and shutdown handling. The iOS settings screen remains unchanged.
+
 ## [0.16.3] — 2026-07-19
 
 **For players:**

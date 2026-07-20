@@ -6,11 +6,19 @@ import GameCore
 
 /// A custom NSWindow subclass that hosts the SpriteKit rendering view.
 @MainActor
-public final class GameWindow: NSWindow, @preconcurrency SKViewDelegate {
+public final class GameWindow: NSWindow, @preconcurrency SKViewDelegate, NSWindowDelegate {
 
     private let gameView: SKView
     private let gameScene: GameScene
     private var hdrSurfaceConfigured = false
+    /// Bewusst getrennt von `styleMask`: Während AppKits Vollbildanimation gilt der Zustand erst
+    /// nach `windowDidEnterFullScreen` als aktiv und bereits ab `windowWillExitFullScreen` als aus.
+    private var isNativeFullScreen = false
+    /// NSCursor.hide()/unhide() sind gepaart. Dieses Flag verhindert doppelte Aufrufe und damit
+    /// einen global falsch bilanzierten Cursor-Hide-Count.
+    private var cursorHiddenByGame = false
+    private var isPreparingForTermination = false
+    private var didRequestSavedFullScreen = false
 
     public init() {
         let contentRect = NSRect(x: 0, y: 0, width: 1024, height: 768)
@@ -30,17 +38,19 @@ public final class GameWindow: NSWindow, @preconcurrency SKViewDelegate {
             backing: .buffered,
             defer: false
         )
-        
+
         self.title = "Exploids"
         self.center()
         self.minSize = NSSize(width: 800, height: 600)
-        
+        self.collectionBehavior.insert(.fullScreenPrimary)
+        self.delegate = self
+
         // Apply modern macOS dark aqua appearance to the window
         self.appearance = NSAppearance(named: .darkAqua)
-        
+
         // Initialize SKView to enable SpriteKit rendering
         gameView.autoresizingMask = [.width, .height]
-        
+
         // Show diagnostic overlays for development verification
         gameView.showsFPS = true
         gameView.showsNodeCount = true
@@ -48,7 +58,7 @@ public final class GameWindow: NSWindow, @preconcurrency SKViewDelegate {
         // Früh als Content-View einsetzen, damit die HDR-Erkennung den Bildschirm des echten
         // Fensters (und nicht pauschal NSScreen.main) abfragen kann.
         self.contentView = gameView
-        
+
         // Set up the GameScene as the content
         let scene = gameScene
         scene.scaleMode = .resizeFill
@@ -61,6 +71,9 @@ public final class GameWindow: NSWindow, @preconcurrency SKViewDelegate {
         // Fixed-Timestep: nach einem Hänger (Fenster-Drag, App im Hintergrund) höchstens 0.25 s
         // Echtzeit als Sim-Schritte nachholen, statt die ganze Pause aufzuarbeiten.
         scene.maxFrameDelta = 0.25
+        // Nur die macOS-Shell bietet die native Vollbildoption an. iOS und Headless-Renderer lassen
+        // die gemeinsame Settings-Zeile mit ihrem Default `false` vollständig verborgen.
+        scene.configureFullScreenSetting(available: true)
         // Aufnahme jedes Laufs bei Game Over ins Archiv schreiben (für GIF-Erstellung, auch ohne
         // Highscore). Siehe Main.replayArchiveDirectory() + die --render-last-replay-CLI.
         scene.replaySaveDirectory = Main.replayArchiveDirectory()
@@ -81,6 +94,38 @@ public final class GameWindow: NSWindow, @preconcurrency SKViewDelegate {
         // erreichen (auch nachdem das Fenster den Fokus verloren und wieder erhalten hat).
         self.initialFirstResponder = gameView
         self.makeFirstResponder(gameView)
+    }
+
+    /// Wird vom AppDelegate aufgerufen, nachdem das Fenster sichtbar und die App aktiv ist. Ein
+    /// gespeichertes ON startet genau einen nativen AppKit-Übergang; OFF erhält das bisherige
+    /// Fenster-Startverhalten. Der bestätigte Delegate-Callback persistiert anschließend den Stand.
+    public func restoreSavedFullScreenPreference() {
+        guard !didRequestSavedFullScreen else { return }
+        didRequestSavedFullScreen = true
+        guard gameScene.fullScreenEnabled else { return }
+
+        DispatchQueue.main.async { [weak self] in
+            guard let self,
+                  !self.isPreparingForTermination,
+                  self.isVisible,
+                  !self.styleMask.contains(.fullScreen) else { return }
+            self.toggleFullScreen(nil)
+        }
+    }
+
+    /// App-Aktivierungswechsel können erfolgen, während SpriteKit nicht rendert. Deshalb stößt der
+    /// AppDelegate die Cursorentscheidung zusätzlich zu den Render- und Fenster-Callbacks direkt an.
+    public func applicationActivationDidChange() {
+        refreshCursorVisibility()
+    }
+
+    /// Vor Fensterabbau/Prozessende den Cursor sofort freigeben und spätere AppKit-Exit-Callbacks
+    /// nicht als bewusste Nutzeränderung speichern. Der bereits bestätigte Vollbildwert bleibt so
+    /// für den nächsten Start erhalten.
+    public func prepareForTermination() {
+        guard !isPreparingForTermination else { return }
+        isPreparingForTermination = true
+        setCursorHidden(false)
     }
 
     /// Prüft immer den Bildschirm, auf dem sich das Fenster gerade befindet. Das deckt neben
@@ -115,8 +160,85 @@ public final class GameWindow: NSWindow, @preconcurrency SKViewDelegate {
         gameScene.updateHDRDisplay(available: available, currentHeadroom: headroom)
     }
 
+    /// Versteckt den Cursor ausschließlich während tatsächlich aktivem Vollbild-Gameplay. Menüs,
+    /// Pausen, andere aktive Fenster und andere Apps müssen jederzeit einen sichtbaren Cursor haben.
+    private func refreshCursorVisibility() {
+        let shouldHide = isNativeFullScreen
+            && gameScene.gameState == .playing
+            && isKeyWindow
+            && NSApp.isActive
+            && !isPreparingForTermination
+        setCursorHidden(shouldHide)
+    }
+
+    private func setCursorHidden(_ hidden: Bool) {
+        guard hidden != cursorHiddenByGame else { return }
+        cursorHiddenByGame = hidden
+        if hidden {
+            NSCursor.hide()
+        } else {
+            NSCursor.unhide()
+        }
+    }
+
+    /// Gleicht fehlgeschlagene native Animationen mit dem echten AppKit-Zustand ab, statt den
+    /// angeforderten Zustand zu speichern.
+    private func reconcileFullScreenState() {
+        let actualState = styleMask.contains(.fullScreen)
+        isNativeFullScreen = actualState
+        if !isPreparingForTermination {
+            gameScene.synchronizeFullScreenState(actualState)
+        }
+        refreshCursorVisibility()
+    }
+
     public func view(_ view: SKView, shouldRenderAtTime time: TimeInterval) -> Bool {
         refreshHDRDisplay()
+        refreshCursorVisibility()
         return true
+    }
+
+    // MARK: - NSWindowDelegate
+
+    public func windowDidEnterFullScreen(_ notification: Notification) {
+        isNativeFullScreen = true
+        if !isPreparingForTermination {
+            gameScene.synchronizeFullScreenState(true)
+        }
+        refreshCursorVisibility()
+    }
+
+    public func windowWillExitFullScreen(_ notification: Notification) {
+        // Schon vor der Animation freigeben, damit der Cursor beim sichtbaren Desktop zurück ist.
+        isNativeFullScreen = false
+        refreshCursorVisibility()
+    }
+
+    public func windowDidExitFullScreen(_ notification: Notification) {
+        isNativeFullScreen = false
+        if !isPreparingForTermination {
+            gameScene.synchronizeFullScreenState(false)
+        }
+        refreshCursorVisibility()
+    }
+
+    public func windowDidFailToEnterFullScreen(_ window: NSWindow) {
+        reconcileFullScreenState()
+    }
+
+    public func windowDidFailToExitFullScreen(_ window: NSWindow) {
+        reconcileFullScreenState()
+    }
+
+    public func windowDidBecomeKey(_ notification: Notification) {
+        refreshCursorVisibility()
+    }
+
+    public func windowDidResignKey(_ notification: Notification) {
+        refreshCursorVisibility()
+    }
+
+    public func windowWillClose(_ notification: Notification) {
+        prepareForTermination()
     }
 }

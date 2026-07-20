@@ -82,7 +82,7 @@ In Ancient and Mad, the field fills up as you climb the levels:
 - **Start screen:** ▲/▼ switch game mode · ◀/▶ choose the Ancient/Mad starting level (Classic always starts at wave 1) · Space/Enter start · D (or 30 s idle) watch an Ancient autopilot demo · I glossary · O settings · 1–5 watch a replay from the selected mode's high-score board
 - **Ancient / Mad:** Arrow keys / WASD to fly · Space to fire (hold for auto-fire / the sweeping beam) · M toggle music · G toggle HDR Glow · Esc pause / quit
 - **Classic:** Arrow keys / WASD to fly · press Space once per shot · H hyperspace · M toggle music · G toggle HDR Glow · Esc pause / quit
-- **Settings:** M music · N SFX style · F auto-fire · G HDR Glow. Classic always uses its procedural synth profile and disables auto-fire; music and HDR remain independently toggleable. HDR Glow defaults to on, remembers your choice and reports `UNAVAILABLE` on SDR-only displays.
+- **Settings:** M music · N SFX style · F auto-fire · G HDR Glow · Control-Command-F native full screen on Mac. Classic always uses its procedural synth profile and disables auto-fire; music and HDR remain independently toggleable. HDR Glow defaults to on, remembers your choice and reports `UNAVAILABLE` on SDR-only displays. Mac full screen defaults to off, follows both the shortcut and green window button, remembers successful changes across launches, and hides the cursor only during full-screen gameplay.
 - **Replay view:** Esc exits the replay back to the title screen.
 - High scores are saved locally; enter your name on the board when you make the cut.
 - **Cheat:** press `#` for a free extra life — handy for testing, or for a relaxed, no‑pressure run.

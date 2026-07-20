@@ -198,6 +198,33 @@ public final class GameScene: SKScene {
     /// false = Liste ist ausgelagert in die eigene `.highScores`-Ansicht (iOS).
     public var showsHighScoresOnStartScreen: Bool = true
 
+    // MARK: - Vollbild-Präferenz (native Umsetzung ausschließlich durch den Host)
+
+    /// Zuletzt erfolgreich bestätigter nativer Vollbildzustand. Ohne gespeicherten Wert startet
+    /// die App weiterhin im Fenster. Der Wert beeinflusst weder Simulation noch Replaydaten.
+    public private(set) var fullScreenEnabled: Bool = FullScreenPreferenceStore.load()
+
+    /// Nur der macOS-Host aktiviert diese Zeile. iOS ist ohnehin immer bildschirmfüllend und lässt
+    /// die plattformspezifische Einstellung deshalb vollständig verborgen.
+    public private(set) var isFullScreenSettingAvailable: Bool = false
+
+    /// Teilt der gemeinsamen Settings-Ansicht mit, ob der konkrete Host natives Vollbild anbietet.
+    /// Die AppKit-Shell ruft dies vor dem Präsentieren der Scene mit `true` auf.
+    public func configureFullScreenSetting(available: Bool) {
+        isFullScreenSettingAvailable = available
+        settingsFullScreenLabel.isHidden = gameState != .settings || !available
+        updateSettingsLabels()
+    }
+
+    /// Übernimmt ausschließlich einen vom Host bestätigten nativen Fensterzustand und persistiert
+    /// ihn. Dadurch können fehlgeschlagene AppKit-Animationen die Einstellung nicht vorzeitig ändern.
+    public func synchronizeFullScreenState(_ enabled: Bool) {
+        guard isFullScreenSettingAvailable else { return }
+        fullScreenEnabled = enabled
+        FullScreenPreferenceStore.save(enabled)
+        updateSettingsLabels()
+    }
+
     // MARK: - HDR-Vektorglühen (Displaydaten kommen ausschließlich vom Host)
 
     /// Vom Spieler gewählte, dauerhaft gespeicherte Präferenz. Sie kann auch `true` bleiben, wenn
@@ -527,12 +554,13 @@ public final class GameScene: SKScene {
     let livesLabel = SKLabelNode(fontNamed: "Courier")
     let levelSelectionLabel = SKLabelNode(fontNamed: "Courier-Bold")
     let modeSelectionLabel = SKLabelNode(fontNamed: "Courier-Bold")
-    // Einstellungen-Ansicht: Titel + vier Umschalt-Zeilen + Bedien-Hinweis.
+    // Einstellungen-Ansicht: Titel + Umschalt-Zeilen + Bedien-Hinweis.
     let settingsTitleLabel = SKLabelNode(fontNamed: "Courier-Bold")
     let settingsMusicLabel = SKLabelNode(fontNamed: "Courier")
     let settingsSfxLabel = SKLabelNode(fontNamed: "Courier")
     let settingsAutoFireLabel = SKLabelNode(fontNamed: "Courier")
     let settingsHDRGlowLabel = SKLabelNode(fontNamed: "Courier")
+    let settingsFullScreenLabel = SKLabelNode(fontNamed: "Courier")
     let settingsHintLabel = SKLabelNode(fontNamed: "Courier")
     let levelClearedLabel = SKLabelNode(fontNamed: "Courier-Bold")
     let prepareNextLevelLabel = SKLabelNode(fontNamed: "Courier")
@@ -2732,6 +2760,7 @@ public final class GameScene: SKScene {
         settingsSfxLabel.isHidden = true
         settingsAutoFireLabel.isHidden = true
         settingsHDRGlowLabel.isHidden = true
+        settingsFullScreenLabel.isHidden = true
         settingsHintLabel.isHidden = true
         levelClearedLabel.isHidden = true
         prepareNextLevelLabel.isHidden = true
@@ -3073,8 +3102,9 @@ public final class GameScene: SKScene {
             settingsSfxLabel.isHidden = false
             settingsAutoFireLabel.isHidden = false
             settingsHDRGlowLabel.isHidden = false
+            settingsFullScreenLabel.isHidden = !isFullScreenSettingAvailable
             // Auf iOS keinen Bedien-Hinweis zeigen (Tap-to-toggle/X-Back versteht sich von selbst und
-            // überlappte den SFX-Button). macOS behält den Tastatur-Hinweis (M/N/F/G, ESC).
+            // überlappte den SFX-Button). macOS behält den Tastatur-/Vollbild-Hinweis.
             settingsHintLabel.isHidden = isCompactLayout
         }
 

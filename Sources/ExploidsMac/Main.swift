@@ -7,7 +7,7 @@ import GameCore
 /// drawing the programmatic Dock icon, and setting up the native macOS menu bar.
 @MainActor
 public final class AppDelegate: NSObject, NSApplicationDelegate {
-    private var window: NSWindow?
+    private var window: GameWindow?
     private var aboutWindow: NSWindow?
 
     /// App-Version – Single Source of Truth ist die gebaute Bundle-Version (CFBundleShortVersionString,
@@ -25,11 +25,13 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         // 1. Programmatically draw and assign a high-res retro Dock icon
         setProgrammaticDockIcon()
         
-        // 2. Configure a native macOS menu bar with About Exploids window
-        setupMenuBar()
+        // 2. Configure a native macOS menu bar with About Exploids and Full Screen commands
+        setupMenuBar(for: gameWindow)
         
         // Bring the app to the foreground
         NSApp.activate(ignoringOtherApps: true)
+        gameWindow.applicationActivationDidChange()
+        gameWindow.restoreSavedFullScreenPreference()
 
         // Hintergrundmusik starten (läuft durchgehend über alle Screens; mit „M" umschaltbar).
         MusicPlayer.shared.start()
@@ -40,6 +42,23 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         return true
     }
     
+    public func applicationDidBecomeActive(_ notification: Notification) {
+        window?.applicationActivationDidChange()
+    }
+
+    public func applicationDidResignActive(_ notification: Notification) {
+        window?.applicationActivationDidChange()
+    }
+
+    public func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        window?.prepareForTermination()
+        return .terminateNow
+    }
+
+    public func applicationWillTerminate(_ notification: Notification) {
+        window?.prepareForTermination()
+    }
+
     // MARK: - Programmatic Dock Icon Setup
     
     private func setProgrammaticDockIcon() {
@@ -96,7 +115,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     
     // MARK: - Native macOS Menu Bar Configuration
     
-    private func setupMenuBar() {
+    private func setupMenuBar(for gameWindow: GameWindow) {
         let mainMenu = NSMenu()
         
         let appMenuItem = NSMenuItem()
@@ -117,6 +136,23 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         quitItem.target = NSApp
         appSubmenu.addItem(quitItem)
         
+        // View-Menü mit dem nativen macOS-Vollbildkommando. Der direkte Window-Target stellt
+        // sicher, dass ⌃⌘F auch dann funktioniert, wenn die SpriteKit-View First Responder ist.
+        let viewMenuItem = NSMenuItem(title: "View", action: nil, keyEquivalent: "")
+        mainMenu.addItem(viewMenuItem)
+
+        let viewSubmenu = NSMenu(title: "View")
+        viewMenuItem.submenu = viewSubmenu
+
+        let fullScreenItem = NSMenuItem(
+            title: "Toggle Full Screen",
+            action: #selector(NSWindow.toggleFullScreen(_:)),
+            keyEquivalent: "f"
+        )
+        fullScreenItem.keyEquivalentModifierMask = [.command, .control]
+        fullScreenItem.target = gameWindow
+        viewSubmenu.addItem(fullScreenItem)
+
         NSApp.mainMenu = mainMenu
     }
     

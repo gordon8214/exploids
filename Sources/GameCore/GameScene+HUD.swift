@@ -130,7 +130,8 @@ extension GameScene {
 
         let settingsRows: [(SKLabelNode, CGFloat)] = [
             (settingsMusicLabel, 70), (settingsSfxLabel, 25),
-            (settingsAutoFireLabel, -20), (settingsHDRGlowLabel, -65)
+            (settingsAutoFireLabel, -20), (settingsHDRGlowLabel, -65),
+            (settingsFullScreenLabel, -110)
         ]
         for (label, y) in settingsRows {
             label.fontSize = 22
@@ -145,7 +146,7 @@ extension GameScene {
         settingsHintLabel.fontSize = 16
         settingsHintLabel.fontColor = .lightGray
         settingsHintLabel.horizontalAlignmentMode = .center
-        settingsHintLabel.position = CGPoint(x: 0, y: -125)
+        settingsHintLabel.position = CGPoint(x: 0, y: -165)
         settingsHintLabel.zPosition = 100
         settingsHintLabel.isHidden = true
         self.addChild(settingsHintLabel)
@@ -476,7 +477,7 @@ extension GameScene {
         }
     }
 
-    /// Aktualisiert die vier Umschalt-Zeilen der Einstellungen mit dem aktuellen Stand.
+    /// Aktualisiert die Umschalt-Zeilen der Einstellungen mit dem aktuellen Stand.
     func updateSettingsLabels() {
         settingsMusicLabel.text = "MUSIC: \(MusicPlayer.shared.isEnabled ? "ON" : "OFF")"
         settingsSfxLabel.text = isClassicInterfaceActive
@@ -490,8 +491,11 @@ extension GameScene {
         } else {
             settingsHDRGlowLabel.text = "HDR GLOW: UNAVAILABLE"
         }
+        settingsFullScreenLabel.text = "FULL SCREEN: \(fullScreenEnabled ? "ON" : "OFF")"
+        let macHint = "M: MUSIC   N: SFX   F: AUTO-FIRE   G: HDR GLOW   "
+            + "⌃⌘F: FULL SCREEN   ESC: BACK"
         settingsHintLabel.text = isCompactLayout ? "TAP TO TOGGLE   X: BACK"
-                                                 : "M: MUSIC   N: SFX   F: AUTO-FIRE   G: HDR GLOW   ESC: BACK"
+                                                 : macHint
     }
 
     /// Aktualisiert die Extra-Leben-Anzeige (nur sichtbar, wenn welche vorhanden).
