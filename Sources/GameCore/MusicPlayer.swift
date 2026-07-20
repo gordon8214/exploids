@@ -2,7 +2,9 @@ import AVFoundation
 import Foundation
 
 /// Spielt die Chiptune-Hintergrundmusik ab: die vorhandenen Tracks laufen abwechselnd in
-/// Endlosschleife – durchgehend über Start-, Spiel- und Game-Over-Screen.
+/// Endlosschleife – durchgehend über Start-, Spiel- und Game-Over-Screen. Während einer
+/// Classic-Asteroids-Partie wird sie vorübergehend pausiert, damit nur deren Arcade-Herzschlag
+/// zu hören ist.
 ///
 /// Die Musik lässt sich global mit „M" ein-/ausschalten. Einmal ausgeschaltet, bleibt sie bis zum
 /// Programmende aus (reiner Laufzeit-Schalter, kein Persistieren) – außer man schaltet sie wieder ein.
@@ -13,7 +15,7 @@ import Foundation
 ///   (siehe `SoundManager.makeMusicNode`). Grund: Ein separater `AVAudioPlayer` neben der laufenden
 ///   SFX-Engine erzeugt auf iOS Verzerrungen (zwei Render-Pfade auf dieselbe Audio-Hardware). Über
 ///   einen gemeinsamen Knoten gibt es nur einen Render-Pfad und damit saubere Musik.
-public final class MusicPlayer: NSObject, AVAudioPlayerDelegate, @unchecked Sendable {
+public final class MusicPlayer: NSObject, @unchecked Sendable {
 
     /// Gemeinsame Singleton-Instanz.
     public static let shared = MusicPlayer()
@@ -23,6 +25,11 @@ public final class MusicPlayer: NSObject, AVAudioPlayerDelegate, @unchecked Send
 
     /// Ob Musik aktuell gewünscht ist (Schalter über „M").
     public private(set) var isEnabled = true
+
+    /// Vorübergehende Unterdrückung durch den laufenden Spielmodus. Anders als `isEnabled` ist das
+    /// keine Spielerpräferenz: Beim Verlassen von Classic wird eine zuvor aktivierte Musik
+    /// automatisch fortgesetzt.
+    private(set) var isPlaybackSuppressed = false
 
     // In Tests bzw. mit --no-sound spielt keine Musik.
     private let isSuppressed: Bool = {
@@ -61,7 +68,7 @@ public final class MusicPlayer: NSObject, AVAudioPlayerDelegate, @unchecked Send
 
     /// Startet die Wiedergabe (falls aktiviert und noch nicht laufend).
     public func start() {
-        guard isEnabled, !isSuppressed, !tracks.isEmpty else { return }
+        guard isEnabled, !isPlaybackSuppressed, !isSuppressed, !tracks.isEmpty else { return }
         #if os(iOS)
         startEngineMusic()
         #else
@@ -87,6 +94,23 @@ public final class MusicPlayer: NSObject, AVAudioPlayerDelegate, @unchecked Send
             #else
             player?.pause()
             #endif
+        }
+    }
+
+    /// Pausiert oder reaktiviert die Theme-Musik, ohne den „M"-Schalter zu verändern.
+    func setPlaybackSuppressed(_ suppressed: Bool) {
+        guard isPlaybackSuppressed != suppressed else { return }
+        isPlaybackSuppressed = suppressed
+        if suppressed {
+            #if os(iOS)
+            lock.lock()
+            musicNode?.pause()
+            lock.unlock()
+            #else
+            player?.pause()
+            #endif
+        } else {
+            start()
         }
     }
 
@@ -131,14 +155,17 @@ public final class MusicPlayer: NSObject, AVAudioPlayerDelegate, @unchecked Send
         node.play()
     }
 
-    /// Nach einem Engine-Neustart: den (noch attachten) Knoten neu einplanen und weiterspielen.
+    /// Nach einem Engine-Neustart den (noch attachten) Knoten neu einplanen und nur dann
+    /// weiterspielen, wenn weder Einstellung noch Classic-Modus die Musik pausieren.
     private func handleEngineReset() {
         lock.lock()
         defer { lock.unlock() }
-        guard started, let node = musicNode, isEnabled, !isSuppressed else { return }
+        guard started, let node = musicNode, !isSuppressed else { return }
         node.stop()              // verwirft Reste, setzt den Knoten zurück
         scheduleCurrentLocked()  // aktuellen Track neu anhängen
-        node.play()
+        if isEnabled && !isPlaybackSuppressed {
+            node.play()
+        }
     }
 
     /// Plant den aktuellen Track ein; im Completion-Handler wird auf den nächsten Track gewechselt
@@ -155,7 +182,7 @@ public final class MusicPlayer: NSObject, AVAudioPlayerDelegate, @unchecked Send
             if !self.tracks.isEmpty {
                 self.index = (self.index + 1) % self.tracks.count
             }
-            if self.isEnabled && !self.isSuppressed {
+            if self.isEnabled && !self.isPlaybackSuppressed && !self.isSuppressed {
                 self.scheduleCurrentLocked()
             }
         }
@@ -179,17 +206,21 @@ public final class MusicPlayer: NSObject, AVAudioPlayerDelegate, @unchecked Send
         }
     }
 
-    // MARK: - AVAudioPlayerDelegate (nur macOS)
+    #endif
+}
 
+#if !os(iOS)
+// Nur macOS verwendet AVAudioPlayer. Die Conformance darf nicht am gemeinsamen Typ hängen, weil
+// dessen MainActor-Isolation sonst auch in den iOS-Audio-Callbacks fälschlich inferiert wird.
+extension MusicPlayer: AVAudioPlayerDelegate {
     public func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
         // Zum nächsten Track wechseln (abwechselnd, dann von vorn).
         if !tracks.isEmpty {
             index = (index + 1) % tracks.count
         }
-        if isEnabled && !isSuppressed {
+        if isEnabled && !isPlaybackSuppressed && !isSuppressed {
             playCurrent()
         }
     }
-
-    #endif
 }
+#endif

@@ -152,13 +152,16 @@ final class ClassicModeTests: GameCoreTestCase {
         XCTAssertEqual(scene.currentReplayForTesting()?.autoFire, false)
     }
 
-    func testClassicSettingsFixSynthAndAutoFireButLeaveMusicIndependent() {
+    func testClassicSettingsFixSynthAndAutoFireAndSuppressThemeWithoutChangingPreference() {
         let originalSampleSetting = SoundManager.shared.useSampledSFX
-        let originalMusicSetting = MusicPlayer.shared.isEnabled
+        let musicPlayer = MusicPlayer.shared
+        let originalMusicSetting = musicPlayer.isEnabled
         defer {
             SoundManager.shared.useSampledSFX = originalSampleSetting
-            MusicPlayer.shared.setEnabled(originalMusicSetting)
+            musicPlayer.setPlaybackSuppressed(false)
+            musicPlayer.setEnabled(originalMusicSetting)
         }
+        musicPlayer.setEnabled(true)
 
         let (scene, view) = makeClassicScene(seed: 131)
         _ = view
@@ -169,9 +172,26 @@ final class ClassicModeTests: GameCoreTestCase {
         XCTAssertFalse(scene.autoFire)
         XCTAssertEqual(scene.settingsSfxLabel.text, "SFX STYLE: CLASSIC SYNTH (FIXED)")
         XCTAssertEqual(scene.settingsAutoFireLabel.text, "AUTO-FIRE: DISABLED")
+        XCTAssertTrue(musicPlayer.isEnabled, "Classic darf die Spielerpräferenz nicht ausschalten")
+        XCTAssertTrue(musicPlayer.isPlaybackSuppressed, "Classic muss die Theme-Musik pausieren")
 
         scene.simulateTypeCharacter("m")
-        XCTAssertEqual(MusicPlayer.shared.isEnabled, !originalMusicSetting)
+        XCTAssertFalse(musicPlayer.isEnabled)
+        scene.simulateTypeCharacter("m")
+        XCTAssertTrue(musicPlayer.isEnabled)
+        XCTAssertTrue(musicPlayer.isPlaybackSuppressed,
+                      "Aktivieren per M darf die Theme-Musik in Classic nicht starten")
+
+        scene.transitionTo(.quitConfirmation)
+        XCTAssertTrue(musicPlayer.isPlaybackSuppressed)
+        scene.transitionTo(.playing)
+        XCTAssertTrue(musicPlayer.isPlaybackSuppressed)
+        scene.transitionTo(.gameOver)
+        XCTAssertTrue(musicPlayer.isPlaybackSuppressed)
+        scene.transitionTo(.startScreen)
+        XCTAssertFalse(musicPlayer.isPlaybackSuppressed,
+                       "Nach Classic muss eine aktivierte Theme-Musik wieder freigegeben werden")
+        XCTAssertTrue(musicPlayer.isEnabled)
     }
 
     func testClassicShipsBonusAndClearCenterRespawnWithoutInvulnerability() {

@@ -2693,6 +2693,19 @@ public final class GameScene: SKScene {
     public func transitionTo(_ newState: GameState) {
         let previousState = self.gameState
         self.gameState = newState
+
+        // Classic besitzt mit seinem beschleunigenden Herzschlag eine eigene Arcade-Musik. Die
+        // Theme-Playlist bleibt deshalb für die gesamte Classic-Partie einschließlich Pause,
+        // Initialeneingabe und Game Over stumm. In Menüs und Standard-Modi gilt wieder unverändert
+        // die Spielerpräferenz des „M"-Schalters.
+        switch newState {
+        case .playing:
+            MusicPlayer.shared.setPlaybackSuppressed(selectedMode == .classicAsteroids)
+        case .nameEntry, .gameOver, .quitConfirmation:
+            MusicPlayer.shared.setPlaybackSuppressed(gameMode == .classicAsteroids)
+        case .startScreen, .glossary, .highScores, .settings:
+            MusicPlayer.shared.setPlaybackSuppressed(false)
+        }
         
         // Hide all labels first
         titleLabel.isHidden = true

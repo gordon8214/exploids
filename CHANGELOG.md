@@ -2,6 +2,13 @@
 
 All notable changes to Exploids. Dates are ISO 8601 (YYYY-MM-DD).
 
+## [0.16.1] — 2026-07-19
+
+**For players:**
+- Fixed the regular theme music continuing over Classic Asteroids' procedural arcade heartbeat.
+  The theme now stays paused for the full Classic session and resumes on returning to the menu,
+  without changing the player's MUSIC preference.
+
 ## [0.16.0] — 2026-07-19
 
 **For players:**
