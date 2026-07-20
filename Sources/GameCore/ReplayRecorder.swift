@@ -13,6 +13,7 @@ public final class ReplayRecorder {
     private let startLevel: Int
     private let gameMode: GameMode
     private let autoFire: Bool
+    private let classicRapidFire: Bool
     private let width: Int
     private let height: Int
 
@@ -20,11 +21,13 @@ public final class ReplayRecorder {
     private var steps: UInt32 = 0
 
     public init(seed: UInt64, startLevel: Int, gameMode: GameMode, autoFire: Bool,
+                classicRapidFire: Bool = false,
                 width: Int, height: Int) {
         self.seed = seed
         self.startLevel = startLevel
         self.gameMode = gameMode
         self.autoFire = autoFire
+        self.classicRapidFire = classicRapidFire
         self.width = width
         self.height = height
     }
@@ -48,6 +51,7 @@ public final class ReplayRecorder {
     public func makeReplay() -> Replay {
         Replay(seed: seed, startLevel: startLevel, gameMode: gameMode,
                events: events, frameCount: Int(steps), autoFire: autoFire,
+               classicRapidFire: classicRapidFire,
                width: width, height: height)
     }
 }

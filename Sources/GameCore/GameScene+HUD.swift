@@ -482,7 +482,9 @@ extension GameScene {
         let hint = isCompactLayout ? "" : "  (▲/▼ TO SELECT)"
         modeSelectionLabel.text = "MODE: \(modeName)\(hint)"
         if selectedMode == .classicAsteroids {
-            instructionsLabel.text = "W/▲: THRUST   A/D/◀/▶: ROTATE   SPACE: FIRE   H: HYPERSPACE   I: GLOSSARY   O: SETTINGS"
+            let fireHint = classicRapidFire ? "SPACE: FIRE (HOLD = RAPID)" : "SPACE: FIRE"
+            instructionsLabel.text = "W/▲: THRUST   A/D/◀/▶: ROTATE   \(fireHint)   H: HYPERSPACE   "
+                + "I: GLOSSARY   O: SETTINGS"
         } else {
             instructionsLabel.text = "W/▲: THRUST   A/D/◀/▶: ROTATE   SPACE: FIRE (HOLD = AUTO)   I: GLOSSARY   O: SETTINGS"
         }
@@ -495,7 +497,7 @@ extension GameScene {
             ? "SFX STYLE: CLASSIC SYNTH (FIXED)"
             : "SFX STYLE: \(SoundManager.shared.useSampledSFX ? "SAMPLE" : "PROCEDURAL")"
         settingsAutoFireLabel.text = isClassicInterfaceActive
-            ? "AUTO-FIRE: DISABLED"
+            ? "RAPID FIRE: \(classicRapidFire ? "ON" : "OFF")"
             : "AUTO-FIRE: \(autoFire ? "ON" : "OFF")"
         if isHDRGlowAvailable {
             settingsHDRGlowLabel.text = "HDR GLOW: \(hdrGlowEnabled ? "ON" : "OFF")"
@@ -503,7 +505,8 @@ extension GameScene {
             settingsHDRGlowLabel.text = "HDR GLOW: UNAVAILABLE"
         }
         settingsFullScreenLabel.text = "FULL SCREEN: \(fullScreenEnabled ? "ON" : "OFF")"
-        let macHint = "M: MUSIC   N: SFX   F: AUTO-FIRE   G: HDR GLOW   "
+        let fireSettingName = isClassicInterfaceActive ? "RAPID FIRE" : "AUTO-FIRE"
+        let macHint = "M: MUSIC   N: SFX   F: \(fireSettingName)   G: HDR GLOW   "
             + "⌃⌘F: FULL SCREEN   ESC: BACK"
         settingsHintLabel.text = isCompactLayout ? "TAP TO TOGGLE   X: BACK"
                                                  : macHint

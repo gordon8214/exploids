@@ -51,6 +51,12 @@ Kollisionen gegenüber v7 ändern. Das Schema bleibt unverändert: Classic akzep
 Ancient/Mad bleiben von v3 bis v7 kompatibel. Ihre gespeicherte Szenengröße bleibt weiterhin Teil
 des Simulationsvertrags.
 
+**Umsetzungsnotiz Logik-Version 9 (v0.16.12):** Classic besitzt optionales gehaltenes Rapid Fire.
+Der pro Lauf feste Anfangszustand `classicRapidFire` wird zusätzlich gespeichert und fehlt in alten
+Aufnahmen mit dem sicheren Default `false`. Dadurch akzeptiert v9 weiterhin v8-Classic bitgleich;
+Ancient/Mad bleiben von v3 bis v8 kompatibel. v9-Classic-Aufnahmen werden von älteren Binaries
+wegen des höheren Logik-Tags klar abgelehnt statt ohne die neue Einstellung falsch abgespielt.
+
 **Umsetzungsnotiz Phase 1 (erledigt):** PRNG `GameRandom` (SplitMix64) eingeführt; alle
 gameplay-relevanten `.random`-Aufrufe ziehen aus einem pro Lauf geseedeten `rng` (Entities über
 `init(..., using rng:)` + Convenience-Init für Tests). Zeit vereinheitlicht auf akkumulierte
@@ -271,8 +277,8 @@ Licht, die die kurzen Unit-Tests nicht abdeckten:
    nicht reproduzieren (das Replay-Schiff feuerte kaum und starb früh). Fix: `autoFire` ins Format
    aufgenommen (v2) und beim `startReplay` wiederhergestellt; Regressionstest ergänzt. **Lehre:**
    Jede Einstellung, die die Simulation beeinflusst, MUSS in die Aufnahme — ein erneuter Audit der
-   Settings (aktuell: nur `autoFire` ist sim-relevant; Musik/SFX-Stil sind reine Audio-Optionen)
-   ist Pflicht, bevor man sich auf Replays verlässt.
+   Settings (aktuell: `autoFire` und Classic-`classicRapidFire` sind sim-relevant; Musik/SFX-Stil
+   sind reine Audio-Optionen) ist Pflicht, bevor man sich auf Replays verlässt.
 2. **Float-Determinismus ist BINARY-spezifisch, nicht nur architektur-spezifisch.** Ein Lauf, der
    von Binary A aufgezeichnet wurde, reproduziert sich auf einem NEU gebauten Binary B nicht
    zuverlässig — winzige Float-Unterschiede schaukeln sich über zehntausende Frames auf, bis das

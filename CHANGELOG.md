@@ -2,6 +2,20 @@
 
 All notable changes to Exploids. Dates are ISO 8601 (YYYY-MM-DD).
 
+## [0.16.12] — 2026-07-20
+
+**For players:**
+- Classic now offers optional Rapid Fire in Settings. It remains off by default for the original
+  single-press behavior; when enabled, holding FIRE repeats a shot every 0.15 seconds while the
+  existing four-shot limit remains in force.
+- Classic Rapid Fire never shoots without the key being held, stays separate from Ancient/Mad
+  auto-fire and works with both the Mac keyboard and the iOS hold control.
+
+**Under the hood:**
+- Replays now store the Classic Rapid Fire starting state. Replay logic is version 9: v8 Classic
+  recordings remain compatible as Rapid Fire OFF, v3–v8 Ancient/Mad recordings remain compatible,
+  and older Classic logic versions continue to be rejected.
+
 ## [0.16.11] — 2026-07-20
 
 **For players:**

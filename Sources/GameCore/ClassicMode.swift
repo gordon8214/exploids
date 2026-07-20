@@ -28,6 +28,9 @@ enum ClassicTuning {
     /// Bleibt nur als glatter Exploids-Richtungsvektor erhalten; der Betrag des fertigen Schusses
     /// kommt aus dem diskreten Atari-Vektorprofil.
     static let playerShotSpeed: CGFloat = 480.0
+    /// Optionale Exploids-Spielhilfe, kein Wert aus dem Arcade-ROM: Beim Halten von FIRE wird alle
+    /// 0,15 Sekunden genau ein neuer Schuss versucht. Das Vier-Slot-Limit bleibt unverändert.
+    static let rapidFireInterval: TimeInterval = 0.15
     static let safeRespawnRadius: CGFloat = 105.0
     /// Das Original nutzt für beide Untertassengrößen XINC = +/-$10. Mit drei
     /// Nachkommabits sind das 2 von 1024 Spielfeldeinheiten pro 60-Hz-Frame.
@@ -106,6 +109,9 @@ struct ClassicSession {
     var heartbeatHigh = false
     var waveHits = 0
     var possibleWaveHits = 28
+    /// Nächster fester Simulationszeitpunkt für einen gehaltenen Rapid-Fire-Impuls. `nil` bedeutet,
+    /// dass FIRE nicht gehalten wird oder die optionale Spielhilfe ausgeschaltet ist.
+    var nextRapidFireTime: TimeInterval?
 
     mutating func reset() {
         self = ClassicSession()
@@ -131,7 +137,7 @@ struct ClassicSession {
 
 extension GameScene {
     /// Welcher Modus bestimmt gerade die Einstellungen? Im Spiel zählt der laufende, in Menüs die
-    /// Auswahl. Classic meldet Sample-SFX und Auto-Feuer dadurch zuverlässig als fest/deaktiviert.
+    /// Auswahl. Classic meldet dadurch zuverlässig sein festes Synth-Profil und Rapid-Fire-Menü.
     var isClassicInterfaceActive: Bool {
         switch gameState {
         case .playing, .quitConfirmation, .nameEntry, .gameOver:
@@ -173,6 +179,18 @@ extension GameScene {
             if activeKeys.contains(2) || activeKeys.contains(124) { rotationInput -= 1.0 }
             ship.update(deltaTime: deltaTime, isThrusting: isThrusting, rotationInput: rotationInput)
             ship.wrapAround(screenSize: size)
+        }
+
+        // Rapid Fire ist absichtlich ein einzelner Impuls pro Frist statt einer Aufhol-Schleife:
+        // Auch nach mehreren nachgeholten Fixed Steps entstehen weder Bursts noch Wandzeitbezug.
+        // `fireClassicLaser` hält weiterhin Ataris vier Spielerschuss-Slots ein.
+        if classicRapidFire, isSpaceHeld,
+           let nextRapidFireTime = classicSession.nextRapidFireTime,
+           currentTime + GameScene.simStep / 2.0 >= nextRapidFireTime {
+            if shipActive {
+                fireClassicLaser()
+            }
+            classicSession.nextRapidFireTime = nextRapidFireTime + ClassicTuning.rapidFireInterval
         }
         SoundManager.shared.setThrustActive(isThrusting)
 

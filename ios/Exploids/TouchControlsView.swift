@@ -369,7 +369,7 @@ final class TouchControlsView: UIView {
                     TouchButton(id: 3, relativeRect: CGRect(x: 0.83, y: 0.35, width: 0.15, height: 0.30),
                                 label: "THRUST", kind: .hold(keyCode: 126)),
                     TouchButton(id: 4, relativeRect: CGRect(x: 0.83, y: 0.67, width: 0.15, height: 0.30),
-                                label: "FIRE", kind: .tap(keyCode: 49)),
+                                label: "FIRE", kind: .hold(keyCode: 49)),
                     TouchButton(id: 5, relativeRect: CGRect(x: 0.45, y: 0.0, width: 0.10, height: 0.10),
                                 label: "ESC", kind: .tap(keyCode: 53)),
                 ]
@@ -478,7 +478,10 @@ final class TouchControlsView: UIView {
                 TouchButton(id: 141, relativeRect: CGRect(x: 0.29, y: 0.72, width: 0.20, height: 0.17),
                             label: "SFX", kind: .typeChar("n")),
                 TouchButton(id: 142, relativeRect: CGRect(x: 0.52, y: 0.72, width: 0.20, height: 0.17),
-                            label: "AUTO-FIRE", kind: .typeChar("f")),
+                            label: scene?.selectedGameMode == .classicAsteroids
+                                ? "RAPID FIRE"
+                                : "AUTO-FIRE",
+                            kind: .typeChar("f")),
                 TouchButton(id: 143, relativeRect: CGRect(x: 0.75, y: 0.72, width: 0.20, height: 0.17),
                             label: "HDR GLOW", kind: .typeChar("g")),
                 TouchButton(id: 144, relativeRect: CGRect(x: 0.88, y: 0.04, width: 0.10, height: 0.16),

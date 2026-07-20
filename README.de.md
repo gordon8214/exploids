@@ -48,7 +48,7 @@ Auswahl im Startbildschirm (▲/▼ wechseln, ◀/▶ für den Ancient-/Mad-Star
 
 - **Ancient Asteroids** — der ursprüngliche Exploids-Modus. Festes Spielfeld; Objekte laufen über die Bildschirmränder hinaus und kommen gegenüber wieder herein.
 - **Mad Meteoroids** — das gesamte Feld (Asteroiden, Gravitationsfelder, Power-Ups, Sternenhimmel) rotiert fortlaufend um die Bildschirmmitte, während das Schiff ausgenommen bleibt (Crazy-Comets-Stil). Die Rotationsgeschwindigkeit steigt mit dem Level, mit geplanten Richtungswechseln und gelegentlichen „Record-Scratch"-Rucklern in höheren Leveln.
-- **Classic Asteroids** — ein eigener, vom Einspieler-Arcade-Spiel von 1979 inspirierter Regelsatz: monochrome weiße Spielvektoren, Wellen normaler Brocken, vier Einzelschüsse, horizontal fliegende große/kleine Untertassen, drei Startschiffe, ein Bonusschiff je 10.000 Punkte und `H` für Hyperspace. Classic beginnt immer in Welle 1, hat keine Power-Ups, Bosse, Spezialbrocken, Timer oder Auto-Feuer und nutzt eine eigene Highscore-Liste. Moderner Sternenhimmel, HUD-Farben, Musikschalter und HDR-/EDR-Glow bleiben erhalten.
+- **Classic Asteroids** — ein eigener, vom Einspieler-Arcade-Spiel von 1979 inspirierter Regelsatz: monochrome weiße Spielvektoren, Wellen normaler Brocken, vier standardmäßige Einzelschüsse mit optionalem Schnellfeuer beim Halten, horizontal fliegende große/kleine Untertassen, drei Startschiffe, ein Bonusschiff je 10.000 Punkte und `H` für Hyperspace. Classic beginnt immer in Welle 1, hat keine Power-Ups, Bosse, Spezialbrocken, Timer oder selbsttätiges Auto-Feuer und nutzt eine eigene Highscore-Liste. Moderner Sternenhimmel, HUD-Farben, Musikschalter und HDR-/EDR-Glow bleiben erhalten.
 
 Als Verhaltensreferenzen dienten das [originale Bedienhandbuch](https://www.classicgaming.cc/classics/asteroids/files/tech-info/asteroids_manual.pdf) und der [wiederhergestellte Programm-Quelltext](https://github.com/historicalsource/asteroids/blob/main/A35131.1A). Atari-Grafiken, Samples, Logos, Koordinatentabellen oder Quellcode sind nicht enthalten.
 
@@ -83,9 +83,9 @@ In Ancient und Mad füllt sich das Feld mit steigendem Level:
 
 - **Startbildschirm:** ▲/▼ Spielmodus wechseln · ◀/▶ Ancient-/Mad-Startlevel wählen (Classic beginnt immer in Welle 1) · Leertaste/Enter starten · D (oder 30 s Leerlauf) eine Ancient-Autopilot-Demo ansehen · I Glossar · O Einstellungen · 1–5 ein Replay der zum gewählten Modus gehörenden Highscore-Liste ansehen
 - **Ancient / Mad:** Pfeiltasten / WASD zum Fliegen · Leertaste zum Schießen (halten für Auto-Feuer / sweependen Strahl) · M Musik an/aus · G HDR-Glow an/aus · Esc Pause / Beenden
-- **Classic:** Pfeiltasten / WASD zum Fliegen · Leertaste einmal je Schuss drücken · H Hyperspace · M Musik an/aus · G HDR-Glow an/aus · Esc Pause / Beenden
+- **Classic:** Pfeiltasten / WASD zum Fliegen · Leertaste einmal je Schuss drücken oder Schnellfeuer in den Einstellungen aktivieren und halten · H Hyperspace · M Musik an/aus · G HDR-Glow an/aus · Esc Pause / Beenden
 - **Classic-Anzeige:** Das Arcade-Spielfeld bleibt immer eine feste logische 1024×768-Arena. Fenster- und Vollbildwechsel skalieren sie gleichmäßig; auf Nicht-4:3-Displays erscheinen schwarze Ränder statt Verzerrung oder zusätzlicher Spielfläche.
-- **Einstellungen:** M Musik · N SFX-Stil · F Auto-Feuer · G HDR-Glow · Control-Command-F für natives Vollbild auf dem Mac. Classic verwendet immer sein prozedurales Synth-Profil und deaktiviert Auto-Feuer; Musik und HDR bleiben unabhängig schaltbar. HDR-Glow ist standardmäßig aktiv, merkt sich die Auswahl und zeigt auf reinen SDR-Displays `UNAVAILABLE`. Mac-Vollbild ist standardmäßig aus, folgt sowohl dem Kürzel als auch dem grünen Fensterknopf, bleibt über App-Starts erhalten und verbirgt den Cursor nur während des Vollbild-Spielens.
+- **Einstellungen:** M Musik · N SFX-Stil · F Auto-Feuer / Classic-Schnellfeuer · G HDR-Glow · Control-Command-F für natives Vollbild auf dem Mac. Classic verwendet immer sein prozedurales Synth-Profil und bietet Schnellfeuer beim Halten, das bei jedem App-Start ausgeschaltet ist und nie ohne gehaltene Taste schießt; Musik und HDR bleiben unabhängig schaltbar. HDR-Glow ist standardmäßig aktiv, merkt sich die Auswahl und zeigt auf reinen SDR-Displays `UNAVAILABLE`. Mac-Vollbild ist standardmäßig aus, folgt sowohl dem Kürzel als auch dem grünen Fensterknopf, bleibt über App-Starts erhalten und verbirgt den Cursor nur während des Vollbild-Spielens.
 - **Replay-Ansicht:** Esc verlässt das Replay zurück zum Startbildschirm.
 - Highscores werden lokal gespeichert; bei einer Platzierung den Namen auf der Liste eintragen.
 - **Cheat:** Taste `#` gibt ein Extra‑Leben — praktisch zum Testen oder für einen entspannten Durchlauf ohne Herausforderung.
@@ -127,7 +127,7 @@ Exploids ist ein Hobby-Klon, kein Produkt. Zur ehrlichen Einordnung, Schwachstel
 
 ## iOS-Target (Work in Progress)
 
-Das Repo enthält außerdem ein iOS-App-Target unter `ios/` (SpriteKit + Touch-Steuerung auf dem Bildschirm), das dieselbe `GameCore`-Engine wie der macOS-Build einbindet. In Classic bleibt der linke Flug-Cluster unverändert; die rechte Spalte wird zu **HYPER** (Tippen), **THRUST** (Halten) und **FIRE** (Tippen). Ancient und Mad behalten ihre bisherige Steuerung. Das Target ist ein junges Work in Progress und noch nicht veröffentlicht.
+Das Repo enthält außerdem ein iOS-App-Target unter `ios/` (SpriteKit + Touch-Steuerung auf dem Bildschirm), das dieselbe `GameCore`-Engine wie der macOS-Build einbindet. In Classic bleibt der linke Flug-Cluster unverändert; die rechte Spalte wird zu **HYPER** (Tippen), **THRUST** (Halten) und **FIRE** (Halten; bei ausgeschaltetem Schnellfeuer ein Schuss, bei eingeschaltetem wiederholte Schüsse). Ancient und Mad behalten ihre bisherige Steuerung. Das Target ist ein junges Work in Progress und noch nicht veröffentlicht.
 
 ## Voraussetzungen
 

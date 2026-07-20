@@ -222,21 +222,27 @@ final class ReplayDeterminismTests: GameCoreTestCase {
         XCTAssertLessThan(data.count, 8000, "Eine kurze Aufnahme sollte wenige KB groß sein (war \(data.count) B)")
     }
 
-    /// v3 bis v7 bleiben nur für die von den Classic-Änderungen unveränderten Standardmodi kompatibel.
+    /// v3 bis v8 bleiben für Standardmodi kompatibel; Classic akzeptiert weiterhin erst ab v8.
     func testReplayVersionCompatibility() {
         let ok = Replay(seed: 1, startLevel: 1, gameMode: .ancientAsteroids, events: [], frameCount: 0)
         XCTAssertTrue(ok.isCompatible)
-        for version in 3...7 {
+        for version in 3...8 {
             let legacyAncient = Replay(version: version, seed: 1, startLevel: 1,
                                        gameMode: .ancientAsteroids, events: [], frameCount: 0)
             let legacyMad = Replay(version: version, seed: 1, startLevel: 1,
                                    gameMode: .madMeteoroids, events: [], frameCount: 0)
-            let legacyClassic = Replay(version: version, seed: 1, startLevel: 1,
-                                       gameMode: .classicAsteroids, events: [], frameCount: 0)
             XCTAssertTrue(legacyAncient.isCompatible)
             XCTAssertTrue(legacyMad.isCompatible)
+        }
+        for version in 1...7 {
+            let legacyClassic = Replay(version: version, seed: 1, startLevel: 1,
+                                       gameMode: .classicAsteroids, events: [], frameCount: 0)
             XCTAssertFalse(legacyClassic.isCompatible)
         }
+        let classicV8 = Replay(version: 8, seed: 1, startLevel: 1,
+                               gameMode: .classicAsteroids, events: [], frameCount: 0)
+        XCTAssertTrue(classicV8.isCompatible)
+        XCTAssertFalse(classicV8.classicRapidFire)
 
         for version in [2, Replay.currentLogicVersion + 1] {
             let incompatible = Replay(version: version, seed: 1, startLevel: 1,
@@ -244,23 +250,19 @@ final class ReplayDeterminismTests: GameCoreTestCase {
             XCTAssertFalse(incompatible.isCompatible,
                            "Nicht freigegebene Logik-Versionen müssen inkompatibel bleiben")
         }
-        for version in 1..<Replay.currentLogicVersion {
-            let legacyClassic = Replay(version: version, seed: 1, startLevel: 1,
-                                       gameMode: .classicAsteroids, events: [], frameCount: 0)
-            XCTAssertFalse(legacyClassic.isCompatible,
-                           "Classic darf keine Aufnahme vor Logik-Version 8 akzeptieren")
-        }
     }
 
-    func testStartReplayAcceptsLegacyStandardButRejectsLegacyClassic() {
-        for version in 3...7 {
+    func testStartReplayAcceptsLegacyStandardAndV8ClassicButRejectsOlderClassic() {
+        for version in 3...8 {
             let standardScene = GameScene(size: CGSize(width: 1000, height: 800))
             let standardView = SKView(frame: CGRect(x: 0, y: 0, width: 1000, height: 800))
             standardView.presentScene(standardScene)
             let standard = Replay(version: version, seed: 1, startLevel: 1,
                                   gameMode: .ancientAsteroids, events: [], frameCount: 1)
             XCTAssertTrue(standardScene.startReplay(standard))
+        }
 
+        for version in 3...7 {
             let classicScene = GameScene(size: CGSize(width: 1000, height: 800))
             let classicView = SKView(frame: CGRect(x: 0, y: 0, width: 1000, height: 800))
             classicView.presentScene(classicScene)
@@ -269,6 +271,14 @@ final class ReplayDeterminismTests: GameCoreTestCase {
             XCTAssertFalse(classicScene.startReplay(classic))
             XCTAssertFalse(classicScene.isReplaying)
         }
+
+        let classicV8Scene = GameScene(size: CGSize(width: 1000, height: 800))
+        let classicV8View = SKView(frame: CGRect(x: 0, y: 0, width: 1000, height: 800))
+        classicV8View.presentScene(classicV8Scene)
+        let classicV8 = Replay(version: 8, seed: 1, startLevel: 1,
+                               gameMode: .classicAsteroids, events: [], frameCount: 1)
+        XCTAssertTrue(classicV8Scene.startReplay(classicV8))
+        XCTAssertFalse(classicV8Scene.classicRapidFire)
     }
 
     func testReplayDrivenRestartKeepsRecordedSeed() {
@@ -343,9 +353,10 @@ final class ReplayDeterminismTests: GameCoreTestCase {
         XCTAssertTrue(b.isReplaying, "Nach genau allen Frames läuft die Wiedergabe noch (Abschluss erst im Folgeframe)")
     }
 
-    /// v8-Probe: Die feste Arena muss selbst bei einem Host-Resize erhalten bleiben; Aufnahme und
+    /// Aktuelle Probe der seit v8 festen Arena: Sie muss selbst bei einem Host-Resize erhalten
+    /// bleiben; Aufnahme und
     /// Wiedergabe enden einschließlich Projektilzustand und rationalem Takt bitgleich.
-    func testClassicV8RecordThenReplaySurvivesHostResizeInCanonicalArena() {
+    func testClassicRecordThenReplaySurvivesHostResizeInCanonicalArena() {
         let frames = 240
         let seed: UInt64 = 0xA7A21_0008
         let recordingViewport = CGSize(width: 1728, height: 1084)
@@ -385,7 +396,7 @@ final class ReplayDeterminismTests: GameCoreTestCase {
         guard let replay = recordedScene.currentReplayForTesting() else {
             return XCTFail("Classic-Aufnahme fehlt")
         }
-        XCTAssertEqual(replay.version, 8)
+        XCTAssertEqual(replay.version, Replay.currentLogicVersion)
         XCTAssertEqual(replay.frameCount, frames)
         XCTAssertEqual(replay.width, 1024)
         XCTAssertEqual(replay.height, 768)
@@ -450,6 +461,29 @@ final class ReplayDeterminismTests: GameCoreTestCase {
         let restored = try! Replay(data: try! r.encoded())
         XCTAssertTrue(restored.autoFire)
         XCTAssertEqual(r, restored)
+    }
+
+    func testReplayClassicRapidFireFieldRoundTripsAndDefaultsOffWhenMissing() throws {
+        let rapid = Replay(seed: 6, startLevel: 1, gameMode: .classicAsteroids,
+                           events: [], frameCount: 1, classicRapidFire: true)
+        let encoded = try rapid.encoded()
+        let restored = try Replay(data: encoded)
+        XCTAssertTrue(restored.classicRapidFire)
+        XCTAssertEqual(rapid, restored)
+
+        var format = PropertyListSerialization.PropertyListFormat.binary
+        var legacyPayload = try XCTUnwrap(
+            PropertyListSerialization.propertyList(from: encoded, options: [], format: &format)
+                as? [String: Any]
+        )
+        legacyPayload.removeValue(forKey: "classicRapidFire")
+        let legacyData = try PropertyListSerialization.data(
+            fromPropertyList: legacyPayload,
+            format: .binary,
+            options: 0
+        )
+        let legacy = try Replay(data: legacyData)
+        XCTAssertFalse(legacy.classicRapidFire)
     }
 
     /// Inkompatible Aufnahmen (fremdes Logik-Tag) dürfen nicht abgespielt werden.

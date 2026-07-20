@@ -46,7 +46,7 @@ Pick on the start screen (▲/▼ to switch, ◀/▶ for the Ancient/Mad startin
 
 - **Ancient Asteroids** — the original Exploids mode. Fixed playfield; objects wrap around the screen edges.
 - **Mad Meteoroids** — the whole field (asteroids, gravity wells, power‑ups, starfield) rotates continuously around the screen center while your ship stays exempt (Crazy‑Comets style). Rotation speed ramps with the level, with scheduled direction changes and occasional "record‑scratch" jolts at higher levels.
-- **Classic Asteroids** — a dedicated, one-player 1979-inspired ruleset: monochrome white gameplay vectors, wave-based normal rocks, single-press four-shot firing, horizontal large/small saucers, three starting ships, a bonus ship at each 10,000 points and `H` hyperspace. It always begins at wave 1, has no power-ups, bosses, special rocks, timer or auto-fire, and keeps its own high-score board. The modern starfield, HUD colors, music toggle and HDR/EDR glow remain.
+- **Classic Asteroids** — a dedicated, one-player 1979-inspired ruleset: monochrome white gameplay vectors, wave-based normal rocks, four-shot firing that is single-press by default with optional hold-to-rapid-fire, horizontal large/small saucers, three starting ships, a bonus ship at each 10,000 points and `H` hyperspace. It always begins at wave 1, has no power-ups, bosses, special rocks, timer or hands-free auto-fire, and keeps its own high-score board. The modern starfield, HUD colors, music toggle and HDR/EDR glow remain.
 
 Classic behavior was implemented from the [original operations manual](https://www.classicgaming.cc/classics/asteroids/files/tech-info/asteroids_manual.pdf) and [recovered program source](https://github.com/historicalsource/asteroids/blob/main/A35131.1A) as references. No Atari art, audio samples, logos, coordinate tables or source code are included.
 
@@ -81,9 +81,9 @@ In Ancient and Mad, the field fills up as you climb the levels:
 
 - **Start screen:** ▲/▼ switch game mode · ◀/▶ choose the Ancient/Mad starting level (Classic always starts at wave 1) · Space/Enter start · D (or 30 s idle) watch an Ancient autopilot demo · I glossary · O settings · 1–5 watch a replay from the selected mode's high-score board
 - **Ancient / Mad:** Arrow keys / WASD to fly · Space to fire (hold for auto-fire / the sweeping beam) · M toggle music · G toggle HDR Glow · Esc pause / quit
-- **Classic:** Arrow keys / WASD to fly · press Space once per shot · H hyperspace · M toggle music · G toggle HDR Glow · Esc pause / quit
+- **Classic:** Arrow keys / WASD to fly · press Space once per shot, or enable Rapid Fire in Settings and hold it · H hyperspace · M toggle music · G toggle HDR Glow · Esc pause / quit
 - **Classic display:** the arcade playfield is always a fixed 1024×768 logical arena. Window and full-screen changes scale it uniformly; non-4:3 displays use black bars rather than stretching or expanding gameplay.
-- **Settings:** M music · N SFX style · F auto-fire · G HDR Glow · Control-Command-F native full screen on Mac. Classic always uses its procedural synth profile and disables auto-fire; music and HDR remain independently toggleable. HDR Glow defaults to on, remembers your choice and reports `UNAVAILABLE` on SDR-only displays. Mac full screen defaults to off, follows both the shortcut and green window button, remembers successful changes across launches, and hides the cursor only during full-screen gameplay.
+- **Settings:** M music · N SFX style · F auto-fire / Classic Rapid Fire · G HDR Glow · Control-Command-F native full screen on Mac. Classic always uses its procedural synth profile and offers hold-to-fire Rapid Fire, which starts off on every launch and never fires without the key being held; music and HDR remain independently toggleable. HDR Glow defaults to on, remembers your choice and reports `UNAVAILABLE` on SDR-only displays. Mac full screen defaults to off, follows both the shortcut and green window button, remembers successful changes across launches, and hides the cursor only during full-screen gameplay.
 - **Replay view:** Esc exits the replay back to the title screen.
 - High scores are saved locally; enter your name on the board when you make the cut.
 - **Cheat:** press `#` for a free extra life — handy for testing, or for a relaxed, no‑pressure run.
@@ -125,7 +125,7 @@ Exploids is a hobby clone, not a product. For honest context, with the weak spot
 
 ## iOS target (work in progress)
 
-The repo also contains an iOS app target under `ios/` (SpriteKit + on‑screen touch controls) that links the same `GameCore` engine as the macOS build. In Classic, its left flight cluster is unchanged and the right column becomes **HYPER** (tap), **THRUST** (hold) and **FIRE** (tap); Ancient and Mad retain their existing controls. It is a young work in progress and not yet released.
+The repo also contains an iOS app target under `ios/` (SpriteKit + on‑screen touch controls) that links the same `GameCore` engine as the macOS build. In Classic, its left flight cluster is unchanged and the right column becomes **HYPER** (tap), **THRUST** (hold) and **FIRE** (hold; one shot while Rapid Fire is off, repeated shots while it is on); Ancient and Mad retain their existing controls. It is a young work in progress and not yet released.
 
 ## Requirements
 

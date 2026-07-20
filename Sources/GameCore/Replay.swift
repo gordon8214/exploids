@@ -52,7 +52,9 @@ public struct Replay: Codable, Equatable, Sendable {
     /// v8: Classic verwendet feste 1024×768-Simulationsgrenzen und die Rev.-4-Hüllkurven für
     ///     Schiff, Untertassen und Felsen. Kollisionen und Spawns driften gegenüber v7; Ancient/Mad
     ///     v3 bis v7 bleiben bitgleich.
-    public static let currentLogicVersion: Int = 8
+    /// v9: Classic kann optional gehaltenes Rapid Fire verwenden. Der neue Anfangszustand wird im
+    ///     Replay gespeichert; v8-Classic bleibt als Rapid Fire AUS bitgleich kompatibel.
+    public static let currentLogicVersion: Int = 9
 
     public let version: Int
     public let seed: UInt64
@@ -67,6 +69,10 @@ public struct Replay: Codable, Equatable, Sendable {
     /// fürs Replay festgehalten und wiederhergestellt werden. Bei alten Aufnahmen ohne dieses Feld
     /// (vor dem Fix) wird `false` angenommen.
     public let autoFire: Bool
+    /// War die optionale Classic-Spielhilfe aktiv? Anders als `autoFire` schießt sie nur bei
+    /// gehaltener Feuertaste. Aufnahmen vor v9 besitzen das Feld nicht und werden als `false`
+    /// dekodiert; dadurch bleiben v8-Classic-Läufe bitgleich.
+    public let classicRapidFire: Bool
     /// Szenengröße der Aufnahme (Pixel). Ancient/Mad hängen weiterhin an `size` und müssen in dieser
     /// Größe wiedergegeben werden. Classic zeichnet seit v8 stets seine feste 1024×768-Arena auf.
     /// Default 1024×768 = macOS-Fenster-Standardgröße; v3-Aufnahmen ohne dieses Feld (vor dem Fix)
@@ -81,6 +87,7 @@ public struct Replay: Codable, Equatable, Sendable {
                 events: [InputEvent],
                 frameCount: Int,
                 autoFire: Bool = false,
+                classicRapidFire: Bool = false,
                 width: Int = 1024,
                 height: Int = 768) {
         self.version = version
@@ -90,6 +97,7 @@ public struct Replay: Codable, Equatable, Sendable {
         self.events = events
         self.frameCount = frameCount
         self.autoFire = autoFire
+        self.classicRapidFire = classicRapidFire
         self.width = width
         self.height = height
     }
@@ -98,7 +106,8 @@ public struct Replay: Codable, Equatable, Sendable {
     // `frameCount` noch die dt-Folge. Daraus leiten wir die Schrittzahl ab, damit das Dekodieren
     // nicht wirft – die Aufnahme wird dann ohnehin über `isCompatible` abgelehnt.
     private enum CodingKeys: String, CodingKey {
-        case version, seed, startLevel, gameMode, events, frameCount, autoFire, width, height, dtSequence
+        case version, seed, startLevel, gameMode, events, frameCount, autoFire, classicRapidFire,
+             width, height, dtSequence
     }
 
     public init(from decoder: Decoder) throws {
@@ -115,6 +124,7 @@ public struct Replay: Codable, Equatable, Sendable {
             self.frameCount = (try c.decodeIfPresent([Float].self, forKey: .dtSequence))?.count ?? 0
         }
         self.autoFire = try c.decodeIfPresent(Bool.self, forKey: .autoFire) ?? false
+        self.classicRapidFire = try c.decodeIfPresent(Bool.self, forKey: .classicRapidFire) ?? false
         // Größe fehlt in v3-Aufnahmen vor dem Fix → macOS-Fenster-Standard 1024×768 annehmen.
         self.width = try c.decodeIfPresent(Int.self, forKey: .width) ?? 1024
         self.height = try c.decodeIfPresent(Int.self, forKey: .height) ?? 768
@@ -130,22 +140,23 @@ public struct Replay: Codable, Equatable, Sendable {
         try c.encode(events, forKey: .events)
         try c.encode(frameCount, forKey: .frameCount)
         try c.encode(autoFire, forKey: .autoFire)
+        try c.encode(classicRapidFire, forKey: .classicRapidFire)
         try c.encode(width, forKey: .width)
         try c.encode(height, forKey: .height)
     }
 
-    /// Stimmt die Aufnahme mit der aktuellen Spiel-Logik überein? v3 bis v7 bleiben für Ancient/Mad
-    /// kompatibel, weil v4 bis v8 ausschließlich Classic-Verhalten ändern. Ältere Classic-Läufe
-    /// würden durch andere Projektil-/Untertassenlogik und RNG-Zeitpunkte driften und werden klar
-    /// abgelehnt.
+    /// Stimmt die Aufnahme mit der aktuellen Spiel-Logik überein? v3 bis v8 bleiben für Ancient/Mad
+    /// kompatibel, weil v4 bis v9 ausschließlich Classic-Verhalten ändern. Classic v8 bleibt mit
+    /// dem neuen Default `classicRapidFire == false` ebenfalls bitgleich; noch ältere Classic-Läufe
+    /// driften durch frühere Projektil-/Untertassenlogik und werden klar abgelehnt.
     public var isCompatible: Bool {
         if version == Replay.currentLogicVersion { return true }
-        guard (3...7).contains(version) else { return false }
+        guard (3...8).contains(version) else { return false }
         switch gameMode {
         case .ancientAsteroids, .madMeteoroids:
             return true
         case .classicAsteroids:
-            return false
+            return version == 8
         }
     }
 

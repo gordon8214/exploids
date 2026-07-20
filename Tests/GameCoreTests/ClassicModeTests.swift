@@ -423,13 +423,14 @@ final class ClassicModeTests: GameCoreTestCase {
         XCTAssertTrue(scene.activeAsteroids.allSatisfy { $0.usesClassicAppearance })
     }
 
-    func testClassicFiringIsEdgeTriggeredCappedAtFourAndInheritsVelocity() {
+    func testClassicFiringDefaultsToEdgeTriggeredCappedAtFourAndInheritsVelocity() {
         let (scene, view) = makeClassicScene(seed: 13)
         _ = view
         scene.clearAllEntitiesForTesting()
         scene.ship.zRotation = 0
         scene.ship.velocity = CGPoint(x: 37, y: -12)
         scene.autoFire = true
+        scene.classicRapidFire = false
 
         let expected = ClassicProjectileCalibrator.calibrate(
             angle: scene.ship.zRotation,
@@ -458,9 +459,60 @@ final class ClassicModeTests: GameCoreTestCase {
         advance(scene, steps: 2)
         XCTAssertEqual(scene.activeLasers.count, 4, "Auto-Feuer bleibt in Classic wirkungslos")
         XCTAssertEqual(scene.currentReplayForTesting()?.autoFire, false)
+        XCTAssertEqual(scene.currentReplayForTesting()?.classicRapidFire, false)
     }
 
-    func testClassicSettingsFixSynthAndAutoFireAndSuppressThemeWithoutChangingPreference() {
+    func testClassicRapidFireRepeatsAtFixedCadenceStopsOnReleaseAndHonorsCap() {
+        let (scene, view) = makeClassicScene(seed: 130)
+        _ = view
+        scene.clearAllEntitiesForTesting()
+        scene.classicRapidFire = true
+        let repeatSteps = Int((ClassicTuning.rapidFireInterval / GameScene.simStep).rounded())
+
+        advance(scene, steps: repeatSteps * 2)
+        XCTAssertTrue(scene.activeLasers.isEmpty, "Rapid Fire darf nie ohne gehaltene Taste feuern")
+
+        scene.simulateKeyDown(keyCode: 49)
+        XCTAssertEqual(scene.activeLasers.count, 1, "Der Tastendruck muss sofort feuern")
+        advance(scene, steps: repeatSteps - 1)
+        XCTAssertEqual(scene.activeLasers.count, 1, "Vor Ablauf von 0,15 s darf kein Impuls folgen")
+        advance(scene, steps: 1)
+        XCTAssertEqual(scene.activeLasers.count, 2)
+        advance(scene, steps: repeatSteps)
+        XCTAssertEqual(scene.activeLasers.count, 3)
+        advance(scene, steps: repeatSteps)
+        XCTAssertEqual(scene.activeLasers.count, 4)
+        advance(scene, steps: repeatSteps)
+        XCTAssertEqual(scene.activeLasers.count, 4, "Rapid Fire muss das Vier-Slot-Limit einhalten")
+
+        scene.simulateKeyUp(keyCode: 49)
+        let removed = scene.activeLasers.removeFirst()
+        removed.removeFromParent()
+        advance(scene, steps: repeatSteps * 2)
+        XCTAssertEqual(scene.activeLasers.count, 3, "Nach dem Loslassen darf ein freier Slot leer bleiben")
+    }
+
+    func testClassicRapidFireDoesNotCatchUpWhileShipIsHidden() {
+        let (scene, view) = makeClassicScene(seed: 1301)
+        _ = view
+        scene.clearAllEntitiesForTesting()
+        scene.classicRapidFire = true
+        let repeatSteps = Int((ClassicTuning.rapidFireInterval / GameScene.simStep).rounded())
+
+        scene.simulateKeyDown(keyCode: 49)
+        XCTAssertEqual(scene.activeLasers.count, 1)
+        scene.ship.isHidden = true
+        advance(scene, steps: repeatSteps * 4)
+        XCTAssertEqual(scene.activeLasers.count, 1, "Versteckte Schiffe dürfen nicht feuern")
+
+        scene.ship.isHidden = false
+        advance(scene, steps: repeatSteps - 1)
+        XCTAssertEqual(scene.activeLasers.count, 1, "Verpasste Fristen dürfen keinen Aufhol-Burst erzeugen")
+        advance(scene, steps: 1)
+        XCTAssertEqual(scene.activeLasers.count, 2)
+    }
+
+    func testClassicSettingsFixSynthAndLockRapidFireDuringRunWithoutChangingAutoFire() {
         let originalSampleSetting = SoundManager.shared.useSampledSFX
         let musicPlayer = MusicPlayer.shared
         let originalMusicSetting = musicPlayer.isEnabled
@@ -478,8 +530,9 @@ final class ClassicModeTests: GameCoreTestCase {
         scene.simulateTypeCharacter("f")
         XCTAssertEqual(SoundManager.shared.useSampledSFX, originalSampleSetting)
         XCTAssertFalse(scene.autoFire)
+        XCTAssertFalse(scene.classicRapidFire, "Rapid Fire darf während der Partie nicht umschalten")
         XCTAssertEqual(scene.settingsSfxLabel.text, "SFX STYLE: CLASSIC SYNTH (FIXED)")
-        XCTAssertEqual(scene.settingsAutoFireLabel.text, "AUTO-FIRE: DISABLED")
+        XCTAssertEqual(scene.settingsAutoFireLabel.text, "RAPID FIRE: OFF")
         XCTAssertTrue(musicPlayer.isEnabled, "Classic darf die Spielerpräferenz nicht ausschalten")
         XCTAssertTrue(musicPlayer.isPlaybackSuppressed, "Classic muss die Theme-Musik pausieren")
 
@@ -500,6 +553,36 @@ final class ClassicModeTests: GameCoreTestCase {
         XCTAssertFalse(musicPlayer.isPlaybackSuppressed,
                        "Nach Classic muss eine aktivierte Theme-Musik wieder freigegeben werden")
         XCTAssertTrue(musicPlayer.isEnabled)
+    }
+
+    func testClassicRapidFireSettingIsSessionScopedAndSeparateFromStandardAutoFire() {
+        let (scene, view) = makeScene()
+        _ = view
+        XCTAssertFalse(scene.classicRapidFire, "Engine- und App-Startwert muss AUS sein")
+
+        scene.transitionTo(.startScreen)
+        scene.setGameModeForTesting(.classicAsteroids)
+        scene.autoFire = true
+        scene.transitionTo(.settings)
+        XCTAssertEqual(scene.settingsAutoFireLabel.text, "RAPID FIRE: OFF")
+
+        scene.simulateTypeCharacter("f")
+        XCTAssertTrue(scene.classicRapidFire)
+        XCTAssertTrue(scene.autoFire, "Classic-Rapid-Fire darf Standard-Auto-Feuer nicht verändern")
+        XCTAssertEqual(scene.settingsAutoFireLabel.text, "RAPID FIRE: ON")
+
+        scene.transitionTo(.playing)
+        scene.simulateTypeCharacter("f")
+        XCTAssertTrue(scene.classicRapidFire, "Die Option bleibt während eines aktiven Laufs gesperrt")
+        XCTAssertEqual(scene.currentReplayForTesting()?.classicRapidFire, true)
+
+        scene.transitionTo(.startScreen)
+        XCTAssertTrue(scene.classicRapidFire, "Die Option bleibt innerhalb derselben App-Sitzung erhalten")
+        scene.setGameModeForTesting(.ancientAsteroids)
+        scene.transitionTo(.settings)
+        scene.simulateTypeCharacter("f")
+        XCTAssertFalse(scene.autoFire)
+        XCTAssertTrue(scene.classicRapidFire, "Standard-Auto-Feuer besitzt einen getrennten Schalter")
     }
 
     func testClassicShipsBonusAndClearCenterRespawnWithoutInvulnerability() {
@@ -832,17 +915,55 @@ final class ClassicModeTests: GameCoreTestCase {
         let (scene, view) = makeScene()
         _ = view
         scene.autoFire = true
+        scene.classicRapidFire = true
         scene.startNewGameForTesting(seed: 0xC1A551C, startLevel: 9, mode: .classicAsteroids)
         scene.simulateKeyDown(keyCode: 4)
         scene.simulateKeyUp(keyCode: 4)
         scene.advanceOneStep()
 
         let replay = scene.currentReplayForTesting()
-        XCTAssertEqual(Replay.currentLogicVersion, 8)
+        XCTAssertEqual(Replay.currentLogicVersion, 9)
         XCTAssertEqual(replay?.gameMode.rawValue, 2)
         XCTAssertEqual(replay?.startLevel, 1)
         XCTAssertEqual(replay?.autoFire, false)
+        XCTAssertEqual(replay?.classicRapidFire, true)
         XCTAssertTrue(replay?.events.contains { $0.keyCode == 4 && $0.isDown } == true)
+    }
+
+    func testClassicRapidFireReplayReproducesHeldInputDeterministically() {
+        let (recorded, recordedView) = makeScene()
+        _ = recordedView
+        recorded.classicRapidFire = true
+        recorded.startNewGameForTesting(seed: 0xF17E, mode: .classicAsteroids)
+        recorded.simulateKeyDown(keyCode: 49)
+        advance(recorded, steps: 50)
+        recorded.simulateKeyUp(keyCode: 49)
+        advance(recorded, steps: 30)
+
+        guard let replay = recorded.currentReplayForTesting() else {
+            return XCTFail("Classic-Rapid-Fire-Aufnahme fehlt")
+        }
+        XCTAssertTrue(replay.classicRapidFire)
+
+        let (played, playedView) = makeScene()
+        _ = playedView
+        XCTAssertTrue(played.startReplay(replay))
+        XCTAssertTrue(played.classicRapidFire)
+        for _ in 0..<replay.frameCount { played.advanceOneStep() }
+
+        XCTAssertEqual(played.score, recorded.score)
+        XCTAssertEqual(played.currentLevel, recorded.currentLevel)
+        XCTAssertEqual(played.ship.position.x, recorded.ship.position.x, accuracy: 0.000_001)
+        XCTAssertEqual(played.ship.position.y, recorded.ship.position.y, accuracy: 0.000_001)
+        XCTAssertEqual(played.activeAsteroids.count, recorded.activeAsteroids.count)
+        XCTAssertEqual(played.activeLasers.count, recorded.activeLasers.count)
+        for (actual, expected) in zip(played.activeLasers, recorded.activeLasers) {
+            XCTAssertEqual(actual.position.x, expected.position.x, accuracy: 0.000_001)
+            XCTAssertEqual(actual.position.y, expected.position.y, accuracy: 0.000_001)
+            XCTAssertEqual(actual.velocity.x, expected.velocity.x, accuracy: 0.000_001)
+            XCTAssertEqual(actual.velocity.y, expected.velocity.y, accuracy: 0.000_001)
+            XCTAssertEqual(actual.lifetime, expected.lifetime, accuracy: 0.000_001)
+        }
     }
 
     func testClassicSaucerSelectionAimScoringAndRockInteractions() {
@@ -968,7 +1089,8 @@ final class ClassicModeTests: GameCoreTestCase {
         let standardReplay = Replay(seed: 1, startLevel: 2, gameMode: .ancientAsteroids,
                                     events: [], frameCount: 1)
         let classicReplay = Replay(seed: 2, startLevel: 1, gameMode: .classicAsteroids,
-                                   events: [], frameCount: 1, autoFire: false)
+                                   events: [], frameCount: 1, autoFire: false,
+                                   classicRapidFire: true)
         let standard = HighScore(initials: "STD", score: 123, date: Date(),
                                  replayData: try standardReplay.encoded())
         let classic = HighScore(initials: "CLS", score: 456, date: Date(),
@@ -993,6 +1115,7 @@ final class ClassicModeTests: GameCoreTestCase {
         XCTAssertTrue(scene.watchHighScoreReplay(at: 0))
         XCTAssertEqual(scene.gameMode, .classicAsteroids)
         XCTAssertEqual(scene.currentLevel, 1)
+        XCTAssertTrue(scene.classicRapidFire)
 
         scene.clearHighScores()
         XCTAssertTrue(scene.highScores(for: .ancientAsteroids).isEmpty)

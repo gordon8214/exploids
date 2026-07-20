@@ -499,11 +499,15 @@ public final class GameScene: SKScene {
     private var invincibilityEndTime: TimeInterval = 0.0
     
     // Feuertaste-Status: gehalten = Dauerfeuer (mit normaler bzw. Rapidfire-Feuerrate).
-    private var isSpaceHeld: Bool = false
+    var isSpaceHeld: Bool = false
     /// Auto-Feuer: das Schiff schießt durchgehend von selbst, ohne dass man die Feuertaste hält.
     /// Engine-Default aus (für Headless-Tests); die App-Hosts (macOS/iOS) schalten es zum Start AN
     /// – entspanntes Spielgefühl, ideal fürs iPhone. Umschaltbar (Einstellungen).
     public var autoFire: Bool = false
+    /// Optionale Classic-Spielhilfe: Solange die Feuertaste gehalten wird, wird im festen Takt ein
+    /// weiterer Schuss versucht. Anders als `autoFire` feuert sie nie ohne gehaltene Taste. Der
+    /// Laufzeit-Schalter startet bei jedem App-Start aus und wird nicht persistent gespeichert.
+    public var classicRapidFire: Bool = false
 
     // MARK: - Autopilot / Demo-Attract-Modus
 
@@ -787,6 +791,13 @@ public final class GameScene: SKScene {
         // „F" schaltet Auto-Feuer um (global außer bei der Initialen-Eingabe).
         if gameState != .nameEntry, charactersIgnoringModifiers?.lowercased() == "f" {
             if isClassicInterfaceActive {
+                // Classic-Rapid-Fire ist eine Startoption des Laufs. Während einer aktiven Partie
+                // bleibt sie gesperrt, damit der Recorder genau einen Anfangszustand festhalten kann
+                // und keine zeichenabhängige Einstellungsänderung im Replay verloren geht.
+                if gameState != .playing && gameState != .quitConfirmation {
+                    classicRapidFire.toggle()
+                    updateModeSelectionLabel()
+                }
                 updateSettingsLabels()
                 return
             }
@@ -875,6 +886,10 @@ public final class GameScene: SKScene {
                 if !isSpaceHeld {
                     isSpaceHeld = true
                     fireLaser()
+                    if gameMode == .classicAsteroids, classicRapidFire {
+                        classicSession.nextRapidFireTime = classicSession.elapsedTime
+                            + ClassicTuning.rapidFireInterval
+                    }
                 }
             }
 
@@ -956,6 +971,9 @@ public final class GameScene: SKScene {
             activeKeys.remove(keyCode)
             if keyCode == 49 { // Feuertaste losgelassen: Dauerfeuer beenden
                 isSpaceHeld = false
+                if gameMode == .classicAsteroids {
+                    classicSession.nextRapidFireTime = nil
+                }
             }
         }
     }
@@ -2660,9 +2678,12 @@ public final class GameScene: SKScene {
         // Auto-Feuer-Zustand der Aufnahme wiederherstellen (beeinflusst das Feuern in update() und
         // damit den Spielverlauf). `replayAutoFireOverride` erlaubt es, das für alte Aufnahmen ohne
         // gespeichertes Feld (vor dem Fix) von außen zu erzwingen.
-        autoFire = replay.gameMode == .classicAsteroids
-            ? false
-            : (replayAutoFireOverride ?? replay.autoFire)
+        if replay.gameMode == .classicAsteroids {
+            autoFire = false
+            classicRapidFire = replay.classicRapidFire
+        } else {
+            autoFire = replayAutoFireOverride ?? replay.autoFire
+        }
         startNewGame(seed: replay.seed)
         return true
     }
@@ -2933,8 +2954,12 @@ public final class GameScene: SKScene {
                     // driftet der Lauf (size beeinflusst Spawns/Wrap/Bounds).
                     let replayStartLevel = selectedMode == .classicAsteroids ? 1 : selectedStartLevel
                     let replayAutoFire = selectedMode == .classicAsteroids ? false : autoFire
+                    let replayClassicRapidFire = selectedMode == .classicAsteroids
+                        ? classicRapidFire
+                        : false
                     recorder = ReplayRecorder(seed: currentSeed, startLevel: replayStartLevel,
                                               gameMode: selectedMode, autoFire: replayAutoFire,
+                                              classicRapidFire: replayClassicRapidFire,
                                               width: Int(size.width), height: Int(size.height))
                     lastReplay = nil
                 }
