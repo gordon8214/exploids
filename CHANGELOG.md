@@ -2,6 +2,17 @@
 
 All notable changes to Exploids. Dates are ISO 8601 (YYYY-MM-DD).
 
+## [0.16.9] — 2026-07-20
+
+**For players:**
+- Classic now plays Atari Asteroids' dedicated extra-ship signal whenever a new ship is awarded at
+  a 10,000-point boundary. The award cadence is unchanged; the new cue is a gated 3 kHz tone rather
+  than the unrelated explosion that happens to accompany most scoring hits.
+
+**Under the hood:**
+- The procedural, sample-free cue follows the Rev. 4 `$B0` timer envelope: 88 frames at the arcade's
+  62.5 Hz cadence, alternating four frames of tone with four frames of silence.
+
 ## [0.16.8] — 2026-07-20
 
 **For players:**

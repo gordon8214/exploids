@@ -189,6 +189,7 @@ public final class SoundManager: @unchecked Sendable {
     /// erzeugte Synth und enthält keinerlei übernommene Samples.
     public func playClassicShot() { playSound(.classicShot, forceSynth: true) }
     public func playClassicExplosion() { playSound(.classicExplosion, forceSynth: true) }
+    public func playClassicExtraLife() { playSound(.classicExtraLife, forceSynth: true) }
     public func playClassicSaucerFire() { playSound(.classicSaucerFire, forceSynth: true) }
     public func playClassicHeartbeat(high: Bool) {
         playSound(high ? .classicHeartbeatHigh : .classicHeartbeatLow, forceSynth: true)
@@ -496,8 +497,8 @@ public final class SoundManager: @unchecked Sendable {
         case .ufo:           return "ufo"
         case .levelComplete: return "levelcomplete"
         case .implosion:     return "implosion"
-        case .classicShot, .classicExplosion, .classicHeartbeatLow, .classicHeartbeatHigh,
-             .classicSaucerFire:
+        case .classicShot, .classicExplosion, .classicExtraLife, .classicHeartbeatLow,
+             .classicHeartbeatHigh, .classicSaucerFire:
             return ""
         }
     }
@@ -652,6 +653,7 @@ final class ActiveSound: @unchecked Sendable {
         case implosion
         case classicShot
         case classicExplosion
+        case classicExtraLife
         case classicHeartbeatLow
         case classicHeartbeatHigh
         case classicSaucerFire
@@ -685,6 +687,10 @@ final class ActiveSound: @unchecked Sendable {
             self.totalFrames = Int(0.12 * sampleRate)
         case .classicExplosion:
             self.totalFrames = Int(0.55 * sampleRate)
+        case .classicExtraLife:
+            // Rev. 4 lädt den Extra-Leben-Zähler mit $B0. Der 250-Hz-Interrupt zieht ihn in
+            // jedem zweiten 62,5-Hz-Spielbild viermal herunter: 176 / 4 * 2 = 88 Bilder.
+            self.totalFrames = Int((88.0 / 62.5 * sampleRate).rounded())
         case .classicHeartbeatLow, .classicHeartbeatHigh:
             self.totalFrames = Int(0.11 * sampleRate)
         case .classicSaucerFire:
@@ -831,6 +837,18 @@ final class ActiveSound: @unchecked Sendable {
             let cutoff = 0.22 - 0.18 * progress
             lastSample += cutoff * (noise - lastSample)
             sampleValue = lastSample * (1.0 - progress) * (1.0 - progress) * 0.42
+
+        case .classicExtraLife:
+            // Die Arcade-Hardware schaltet einen festen 3-kHz-Rechteckton mit Bit 2 des
+            // 62,5-Hz-Bildzählers: vier Bilder Ton, vier Bilder Pause. Der globale Zähler
+            // konnte beim Punktegewinn jede Phase haben; hier beginnt die Folge bewusst mit
+            // dem hörbaren Halbzyklus, während Frequenz, Takt und Gesamtdauer erhalten bleiben.
+            let arcadeFrame = Int(Double(currentFrame) * 62.5 / sampleRate)
+            let gateIsOpen = (arcadeFrame / 4).isMultiple(of: 2)
+            let square = phase < .pi ? 1.0 : -1.0
+            sampleValue = gateIsOpen ? square * 0.18 : 0.0
+            phase += 2.0 * .pi * 3_000.0 / sampleRate
+            if phase >= 2.0 * .pi { phase -= 2.0 * .pi }
 
         case .classicHeartbeatLow, .classicHeartbeatHigh:
             let frequency: Double

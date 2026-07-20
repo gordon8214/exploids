@@ -446,6 +446,7 @@ extension GameScene {
         while score >= classicSession.nextBonusScore {
             classicSession.shipsRemaining += 1
             classicSession.nextBonusScore += 10_000
+            SoundManager.shared.playClassicExtraLife()
             updateLivesLabel()
         }
     }

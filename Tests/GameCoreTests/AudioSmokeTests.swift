@@ -27,6 +27,7 @@ final class AudioSmokeTests: GameCoreTestCase {
         sm.playImplosion()
         sm.playClassicShot()
         sm.playClassicExplosion()
+        sm.playClassicExtraLife()
         sm.playClassicHeartbeat(high: false)
         sm.playClassicHeartbeat(high: true)
         sm.playClassicSaucerFire()
@@ -57,6 +58,31 @@ final class AudioSmokeTests: GameCoreTestCase {
         let headEnergy = samples.prefix(50).reduce(0.0) { $0 + abs($1) }
         let tailEnergy = samples.suffix(50).reduce(0.0) { $0 + abs($1) }
         XCTAssertGreaterThan(headEnergy, tailEnergy * 4.0)
+    }
+
+    /// Rev. 4 legt beim Extra-Leben einen festen 3-kHz-Ton für vier Arcade-Bilder an und
+    /// schaltet ihn für vier Bilder ab. 12 kHz teilt sowohl den Ton als auch den 62,5-Hz-Takt
+    /// ganzzahlig, sodass Frequenz, Gate und die aus $B0 abgeleitete Dauer exakt prüfbar sind.
+    func testClassicExtraLifeMatchesAtariToneAndGateCadence() {
+        let sampleRate = 12_000.0
+        let sound = ActiveSound(type: .classicExtraLife, sampleRate: sampleRate)
+        var samples: [Double] = []
+
+        while let sample = sound.nextSample(sampleRate: sampleRate) {
+            samples.append(sample)
+        }
+
+        let samplesPerFourArcadeFrames = 768
+        XCTAssertEqual(samples.count, 16_896, "88 Arcade-Bilder bei 62,5 Hz")
+        XCTAssertTrue(samples.allSatisfy(\.isFinite))
+        XCTAssertEqual(samples[0], 0.18, accuracy: 0.000_001)
+        XCTAssertEqual(samples[2], -0.18, accuracy: 0.000_001,
+                       "3 kHz müssen bei 12 kHz alle zwei Samples das Vorzeichen wechseln")
+        XCTAssertTrue(samples[..<samplesPerFourArcadeFrames].allSatisfy { abs($0) == 0.18 })
+        XCTAssertTrue(samples[samplesPerFourArcadeFrames..<(2 * samplesPerFourArcadeFrames)]
+            .allSatisfy { $0 == 0.0 })
+        XCTAssertTrue(samples[(2 * samplesPerFourArcadeFrames)..<(3 * samplesPerFourArcadeFrames)]
+            .allSatisfy { abs($0) == 0.18 })
     }
 
     /// Die Dauer-Zustands-Schalter (Schub-Hum, Kopf-Stimme) dürfen im gemuteten Zustand in
