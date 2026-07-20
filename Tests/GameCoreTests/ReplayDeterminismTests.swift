@@ -222,11 +222,11 @@ final class ReplayDeterminismTests: GameCoreTestCase {
         XCTAssertLessThan(data.count, 8000, "Eine kurze Aufnahme sollte wenige KB groß sein (war \(data.count) B)")
     }
 
-    /// v3 bis v6 bleiben nur für die von den Classic-Änderungen unveränderten Standardmodi kompatibel.
+    /// v3 bis v7 bleiben nur für die von den Classic-Änderungen unveränderten Standardmodi kompatibel.
     func testReplayVersionCompatibility() {
         let ok = Replay(seed: 1, startLevel: 1, gameMode: .ancientAsteroids, events: [], frameCount: 0)
         XCTAssertTrue(ok.isCompatible)
-        for version in 3...6 {
+        for version in 3...7 {
             let legacyAncient = Replay(version: version, seed: 1, startLevel: 1,
                                        gameMode: .ancientAsteroids, events: [], frameCount: 0)
             let legacyMad = Replay(version: version, seed: 1, startLevel: 1,
@@ -248,12 +248,12 @@ final class ReplayDeterminismTests: GameCoreTestCase {
             let legacyClassic = Replay(version: version, seed: 1, startLevel: 1,
                                        gameMode: .classicAsteroids, events: [], frameCount: 0)
             XCTAssertFalse(legacyClassic.isCompatible,
-                           "Classic darf keine Aufnahme vor Logik-Version 7 akzeptieren")
+                           "Classic darf keine Aufnahme vor Logik-Version 8 akzeptieren")
         }
     }
 
     func testStartReplayAcceptsLegacyStandardButRejectsLegacyClassic() {
-        for version in 3...6 {
+        for version in 3...7 {
             let standardScene = GameScene(size: CGSize(width: 1000, height: 800))
             let standardView = SKView(frame: CGRect(x: 0, y: 0, width: 1000, height: 800))
             standardView.presentScene(standardScene)
@@ -343,14 +343,14 @@ final class ReplayDeterminismTests: GameCoreTestCase {
         XCTAssertTrue(b.isReplaying, "Nach genau allen Frames läuft die Wiedergabe noch (Abschluss erst im Folgeframe)")
     }
 
-    /// v7-Probe für den neuen 62,5-Hz-Phasenzähler und phasenabhängige Classic-Schüsse: Aufnahme
-    /// und Wiedergabe müssen einschließlich Projektilzustand und rationalem Takt bitgleich enden.
-    func testClassicV7RecordThenReplayReproducesBallisticsAndPhaseClock() {
+    /// v8-Probe: Die feste Arena muss selbst bei einem Host-Resize erhalten bleiben; Aufnahme und
+    /// Wiedergabe enden einschließlich Projektilzustand und rationalem Takt bitgleich.
+    func testClassicV8RecordThenReplaySurvivesHostResizeInCanonicalArena() {
         let frames = 240
-        let seed: UInt64 = 0xA7A21_0007
-        let arena = CGSize(width: 1024, height: 768)
+        let seed: UInt64 = 0xA7A21_0008
+        let recordingViewport = CGSize(width: 1728, height: 1084)
 
-        @MainActor func driveClassic(_ scene: GameScene) {
+        @MainActor func driveClassic(_ scene: GameScene, resizing view: SKView?) {
             var fireDown = false
             for frame in 0..<frames {
                 if frame == 8 { scene.simulateKeyDown(keyCode: 13) }
@@ -364,29 +364,40 @@ final class ReplayDeterminismTests: GameCoreTestCase {
                     scene.simulateKeyUp(keyCode: 49)
                     fireDown = false
                 }
+                if frame == frames / 2, let view {
+                    view.frame = CGRect(x: 0, y: 0, width: 874, height: 402)
+                    XCTAssertEqual(scene.size, GameScene.classicLogicalArenaSize)
+                }
                 scene.advanceOneStep()
             }
         }
 
-        let recordedScene = GameScene(size: arena)
-        let recordedView = SKView(frame: CGRect(origin: .zero, size: arena))
+        let recordedScene = GameScene(size: recordingViewport)
+        recordedScene.scaleMode = .resizeFill
+        let recordedView = SKView(frame: CGRect(origin: .zero, size: recordingViewport))
         recordedView.presentScene(recordedScene)
         recordedScene.externalStepDriving = true
         recordedScene.startNewGameForTesting(seed: seed, startLevel: 1, mode: .classicAsteroids)
-        driveClassic(recordedScene)
+        XCTAssertEqual(recordedScene.size, GameScene.classicLogicalArenaSize)
+        driveClassic(recordedScene, resizing: recordedView)
         XCTAssertEqual(recordedScene.gameState, .playing)
         let recordedSnapshot = stateSnapshot(recordedScene)
         guard let replay = recordedScene.currentReplayForTesting() else {
             return XCTFail("Classic-Aufnahme fehlt")
         }
-        XCTAssertEqual(replay.version, 7)
+        XCTAssertEqual(replay.version, 8)
         XCTAssertEqual(replay.frameCount, frames)
+        XCTAssertEqual(replay.width, 1024)
+        XCTAssertEqual(replay.height, 768)
 
-        let replayScene = GameScene(size: arena)
-        let replayView = SKView(frame: CGRect(origin: .zero, size: arena))
+        let replayViewport = CGSize(width: 874, height: 402)
+        let replayScene = GameScene(size: replayViewport)
+        replayScene.scaleMode = .resizeFill
+        let replayView = SKView(frame: CGRect(origin: .zero, size: replayViewport))
         replayView.presentScene(replayScene)
         replayScene.externalStepDriving = true
         XCTAssertTrue(replayScene.startReplay(replay))
+        XCTAssertEqual(replayScene.size, GameScene.classicLogicalArenaSize)
         for _ in 0..<replay.frameCount { replayScene.advanceOneStep() }
 
         XCTAssertEqual(stateSnapshot(replayScene), recordedSnapshot)

@@ -49,7 +49,10 @@ public struct Replay: Codable, Equatable, Sendable {
     /// v7: Classic-Spieler- und Untertassenschüsse verwenden Ataris 62,5-Hz-Lebensdauer,
     ///     Fixed-Point-Geschwindigkeit, Phasenlage, Spawn-Offset und Endpunktzustand. Classic-v6-
     ///     Läufe driften; Ancient/Mad v3 bis v6 bleiben bitgleich.
-    public static let currentLogicVersion: Int = 7
+    /// v8: Classic verwendet feste 1024×768-Simulationsgrenzen und die Rev.-4-Hüllkurven für
+    ///     Schiff, Untertassen und Felsen. Kollisionen und Spawns driften gegenüber v7; Ancient/Mad
+    ///     v3 bis v7 bleiben bitgleich.
+    public static let currentLogicVersion: Int = 8
 
     public let version: Int
     public let seed: UInt64
@@ -64,8 +67,8 @@ public struct Replay: Codable, Equatable, Sendable {
     /// fürs Replay festgehalten und wiederhergestellt werden. Bei alten Aufnahmen ohne dieses Feld
     /// (vor dem Fix) wird `false` angenommen.
     public let autoFire: Bool
-    /// Szenengröße der Aufnahme (Pixel). Die Simulation hängt an `size` (Spawn-Positionen, Wrap-Grenzen,
-    /// Gegner-Eintritt), darum MUSS die Wiedergabe dieselbe Größe verwenden, sonst driftet der Lauf.
+    /// Szenengröße der Aufnahme (Pixel). Ancient/Mad hängen weiterhin an `size` und müssen in dieser
+    /// Größe wiedergegeben werden. Classic zeichnet seit v8 stets seine feste 1024×768-Arena auf.
     /// Default 1024×768 = macOS-Fenster-Standardgröße; v3-Aufnahmen ohne dieses Feld (vor dem Fix)
     /// werden damit korrekt interpretiert.
     public let width: Int
@@ -131,13 +134,13 @@ public struct Replay: Codable, Equatable, Sendable {
         try c.encode(height, forKey: .height)
     }
 
-    /// Stimmt die Aufnahme mit der aktuellen Spiel-Logik überein? v3 bis v6 bleiben für Ancient/Mad
-    /// kompatibel, weil v4 bis v7 ausschließlich Classic-Verhalten ändern. Ältere Classic-Läufe
+    /// Stimmt die Aufnahme mit der aktuellen Spiel-Logik überein? v3 bis v7 bleiben für Ancient/Mad
+    /// kompatibel, weil v4 bis v8 ausschließlich Classic-Verhalten ändern. Ältere Classic-Läufe
     /// würden durch andere Projektil-/Untertassenlogik und RNG-Zeitpunkte driften und werden klar
     /// abgelehnt.
     public var isCompatible: Bool {
         if version == Replay.currentLogicVersion { return true }
-        guard (3...6).contains(version) else { return false }
+        guard (3...7).contains(version) else { return false }
         switch gameMode {
         case .ancientAsteroids, .madMeteoroids:
             return true

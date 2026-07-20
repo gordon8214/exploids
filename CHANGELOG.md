@@ -2,6 +2,21 @@
 
 All notable changes to Exploids. Dates are ISO 8601 (YYYY-MM-DD).
 
+## [0.16.10] — 2026-07-20
+
+**For players:**
+- Classic ship, saucers and all three asteroid tiers now use Atari Rev. 4's original vector
+  centerline bounds: 24×16 for the ship, 40×24 / 20×12 for the saucers and 64 / 32 / 16 for rocks.
+- Classic now always plays in a fixed 1024×768 logical arena. Resizing the window or entering full
+  screen scales the complete playfield uniformly with black bars where needed; it no longer reveals
+  more arena, stretches objects or changes the simulation. Ancient and Mad keep their adaptive field.
+
+**Under the hood:**
+- The existing source-independent Exploids silhouettes are normalized to the arcade envelopes, so
+  their visible outlines and polygon collisions agree without including Atari coordinate tables.
+- Replay logic is now version 8. The schema is unchanged; v3–v7 Ancient/Mad recordings remain
+  compatible, while pre-v8 Classic recordings are rejected instead of drifting.
+
 ## [0.16.9] — 2026-07-20
 
 **For players:**

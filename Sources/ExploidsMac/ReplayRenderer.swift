@@ -25,9 +25,9 @@ enum ReplayRenderer {
         /// Auflösung des GIFs (Ausgabe). Default kompakt für ein Web-GIF.
         var width: Int = 480
         var height: Int = 360
-        /// Simulationsgröße (Szenengröße). MUSS der Aufnahme entsprechen, sonst driftet der Lauf
-        /// (Spawns/Wrap/Bounds hängen an `size`). `nil` = wie Ausgabegröße. Für Aufnahmen aus dem
-        /// macOS-Fenster (Default 1024×768) hier 1024×768 setzen; die Ausgabe wird beim Rendern skaliert.
+        /// Simulationsgröße (Szenengröße) für Ancient/Mad. MUSS der Aufnahme entsprechen, sonst
+        /// driftet der Lauf (Spawns/Wrap/Bounds hängen an `size`). Classic ignoriert diese Werte und
+        /// läuft immer in seiner festen 1024×768-Arena; die Ausgabegröße bleibt davon unabhängig.
         var simWidth: Int? = nil
         var simHeight: Int? = nil
         /// Nur jeden N-ten Simulationsschritt ins GIF aufnehmen. `nil` = automatisch so wählen, dass
@@ -74,11 +74,10 @@ enum ReplayRenderer {
         let width = options.width
         let height = options.height
 
-        // Szene in SIMULATIONSGRÖSSE aufsetzen — per Default die in der Aufnahme gespeicherte Größe
-        // (sonst driftet der Lauf); gerendert wird in die Ausgabe-Textur (width×height), SpriteKit
-        // skaliert via scaleMode .fill. `--sim-scale` kann die Größe überschreiben.
-        let simW = options.simWidth ?? replay.width
-        let simH = options.simHeight ?? replay.height
+        // Szene in SIMULATIONSGRÖSSE aufsetzen — Ancient/Mad nutzen die Aufnahmegröße, Classic
+        // zwingend 1024×768. Gerendert wird unabhängig davon in die Ausgabe-Textur; Classic schaltet
+        // beim Replaystart selbst auf `.aspectFit`, damit abweichende Ausgabeformate nicht verzerren.
+        let (simW, simH) = simulationSize(for: replay, options: options)
         let scene = GameScene(size: CGSize(width: simW, height: simH))
         scene.scaleMode = .fill
         // Exportziele sind bewusst SDR (GIF/BGRA8 bzw. normales Video): keine Werte oberhalb von 1.
@@ -148,8 +147,7 @@ enum ReplayRenderer {
 
         let width = options.width
         let height = options.height
-        let simW = options.simWidth ?? replay.width
-        let simH = options.simHeight ?? replay.height
+        let (simW, simH) = simulationSize(for: replay, options: options)
         let scene = GameScene(size: CGSize(width: simW, height: simH))
         scene.scaleMode = .fill
         scene.updateHDRDisplay(available: false, currentHeadroom: 1.0)
@@ -244,6 +242,16 @@ enum ReplayRenderer {
         ) else { return nil }
         ctx.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
         return buffer
+    }
+
+    /// Der Renderer darf die Classic-Simulation auch über seine programminterne Options-API nicht
+    /// versehentlich vergrößern. Ausgabeauflösung und Seitenverhältnis bleiben davon unabhängig.
+    private static func simulationSize(for replay: Replay, options: Options) -> (Int, Int) {
+        if replay.gameMode == .classicAsteroids {
+            return (Int(GameScene.classicLogicalArenaSize.width),
+                    Int(GameScene.classicLogicalArenaSize.height))
+        }
+        return (options.simWidth ?? replay.width, options.simHeight ?? replay.height)
     }
 
     /// Rendert den aktuellen Szenenzustand in die Textur und liest ihn als `CGImage` zurück.

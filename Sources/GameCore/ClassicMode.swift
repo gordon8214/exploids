@@ -1,5 +1,24 @@
 import SpriteKit
 
+/// Gemeinsame logische Geometrie des Classic-Modus. Die Maße sind die Mittellinien-Hüllkurven
+/// der Rev.-4-Vektorobjekte; Strichstärke und rein optische Effekte zählen bewusst nicht dazu.
+/// Ancient/Mad verwenden weiterhin ihre eigenen, bisherigen Größen.
+enum ClassicGeometry {
+    static let logicalArenaSize = CGSize(width: 1024.0, height: 768.0)
+    static let shipBodySize = CGSize(width: 24.0, height: 16.0)
+    static let shipBodyScale: CGFloat = 0.8
+    static let largeSaucerSize = CGSize(width: 40.0, height: 24.0)
+    static let smallSaucerSize = CGSize(width: 20.0, height: 12.0)
+
+    static func asteroidDiameter(for sizeClass: Asteroid.AsteroidSize) -> CGFloat {
+        switch sizeClass {
+        case .large: return 64.0
+        case .medium: return 32.0
+        case .small: return 16.0
+        }
+    }
+}
+
 /// Alle Arcade-Werte liegen in einem eigenen Profil. Ancient/Mad greifen auf keinen dieser Werte zu.
 enum ClassicTuning {
     static let maximumAsteroids = 26

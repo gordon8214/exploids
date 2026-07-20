@@ -44,6 +44,13 @@ Endbild. Das Replay-Schema blieb unverändert. Jede dieser Änderungen lässt ä
 driften; deshalb akzeptiert v7 für Classic nur v7, während Ancient/Mad von v3 bis v6 kompatibel
 bleiben.
 
+**Umsetzungsnotiz Logik-Version 8 (v0.16.10):** Classic verwendet jetzt unabhängig von Fenster,
+Vollbild oder Gerät eine feste logische 1024×768-Arena; SpriteKit skaliert sie ausschließlich per
+`aspectFit`. Schiff, Untertassen und Felsen nutzen zugleich die Rev.-4-Hüllkurven, wodurch sich
+Kollisionen gegenüber v7 ändern. Das Schema bleibt unverändert: Classic akzeptiert nur v8,
+Ancient/Mad bleiben von v3 bis v7 kompatibel. Ihre gespeicherte Szenengröße bleibt weiterhin Teil
+des Simulationsvertrags.
+
 **Umsetzungsnotiz Phase 1 (erledigt):** PRNG `GameRandom` (SplitMix64) eingeführt; alle
 gameplay-relevanten `.random`-Aufrufe ziehen aus einem pro Lauf geseedeten `rng` (Entities über
 `init(..., using rng:)` + Convenience-Init für Tests). Zeit vereinheitlicht auf akkumulierte
@@ -92,7 +99,7 @@ sondern darin, die Simulation vollständig **deterministisch** zu machen.
   Phase 3 (Fixed-Timestep) entfällt die `dt`-Folge.
 - **Versionsbindung:** Jede Aufnahme trägt das Logik-Versions-Tag. Beim Abspielen wird ein Mismatch
   grundsätzlich abgelehnt; eine ältere Version bleibt nur nach expliziter, modusspezifischer
-  Kompatibilitätsentscheidung zugelassen (aktuell v3–v6 für unveränderte Ancient-/Mad-Läufe).
+  Kompatibilitätsentscheidung zugelassen (aktuell v3–v7 für unveränderte Ancient-/Mad-Läufe).
 - **Audio bleibt außen vor:** Sound wird beim Replay aus Spielereignissen neu getriggert, nicht
   aufgezeichnet. Audio-Zufall (SoundManager) muss daher nicht geseedet werden.
 
@@ -280,7 +287,8 @@ Licht, die die kurzen Unit-Tests nicht abdeckten:
    kompletter Drift, der wie Float-Drift aussah. Ein GameCore-Rebuild reproduziert einen Lauf
    bit-genau, solange **Größe + Seed + Inputs** stimmen (an einem echten ~8-Min-Lauf verifiziert).
    Fix: die Aufnahme-Größe wird jetzt im `Replay` gespeichert (Default 1024×768 für Alt-Aufnahmen)
-   und von Renderer/Verify automatisch genutzt.
+   und von Renderer/Verify automatisch genutzt. Seit v8 verwendet Classic stets seine feste
+   1024×768-Arena; für Ancient/Mad bleibt die jeweils aufgezeichnete Größe verbindlich.
 
 ## Querschnitt: Risiken & Caveats
 

@@ -108,6 +108,10 @@ public struct LevelSpawnConfig: Sendable {
 /// The main gameplay scene representing the Asteroids arena.
 /// Handles ship setup, player inputs (keyboard), lasers, wrapping around edges, and physics updates.
 public final class GameScene: SKScene {
+
+    /// Feste logische Auflösung des Classic-Modus. Fenster, Vollbild und Replay-Export skalieren
+    /// diese Arena ausschließlich gleichmäßig; sie verändern niemals ihre Simulationsgrenzen.
+    public static let classicLogicalArenaSize = ClassicGeometry.logicalArenaSize
     
     public enum DeathCause: Sendable {
         case largeAsteroid
@@ -617,6 +621,11 @@ public final class GameScene: SKScene {
     
     /// Background stars.
     private var stars: [StarNode] = []
+
+    /// Host-Szenenkonfiguration vor dem Eintritt in eine Classic-Partie. Menüs und die beiden
+    /// Exploids-Modi kehren anschließend exakt zu dieser Skalierungsart und den dann aktuellen
+    /// View-Grenzen zurück, damit ein zwischenzeitlicher Resize erhalten bleibt.
+    private var preClassicSceneSizing: (scaleMode: SKSceneScaleMode, size: CGSize)?
     
     // MARK: - Scene Lifecycle
     
@@ -2721,6 +2730,8 @@ public final class GameScene: SKScene {
         let previousState = self.gameState
         self.gameState = newState
 
+        updateSceneSizing(for: newState, previousState: previousState)
+
         // Classic besitzt mit seinem beschleunigenden Herzschlag eine eigene Arcade-Musik. Die
         // Theme-Playlist bleibt deshalb für die gesamte Classic-Partie einschließlich Pause,
         // Initialeneingabe und Game Over stumm. In Menüs und Standard-Modi gilt wieder unverändert
@@ -3120,6 +3131,46 @@ public final class GameScene: SKScene {
         if renderHUDHidden { hideRenderHUD() }
     }
 
+    /// Schaltet ausschließlich während einer Classic-Sitzung auf Ataris feste 1024×768-Arena.
+    /// `.aspectFit` lässt SpriteKit bei jedem Host-Resize die komplette Szene gleichmäßig skalieren;
+    /// freie Flächen bleiben schwarz, statt Simulation, Kollisionsgrenzen oder Replay zu verändern.
+    private func updateSceneSizing(for newState: GameState, previousState: GameState) {
+        let usesClassicArena: Bool
+        switch newState {
+        case .playing:
+            usesClassicArena = previousState == .quitConfirmation
+                ? gameMode == .classicAsteroids
+                : selectedMode == .classicAsteroids
+        case .quitConfirmation, .nameEntry, .gameOver:
+            usesClassicArena = gameMode == .classicAsteroids
+        case .startScreen, .glossary, .highScores, .settings:
+            usesClassicArena = false
+        }
+
+        if usesClassicArena {
+            activateClassicSceneSizing()
+        } else {
+            restoreHostSceneSizing()
+        }
+    }
+
+    private func activateClassicSceneSizing() {
+        if preClassicSceneSizing == nil {
+            preClassicSceneSizing = (scaleMode: scaleMode, size: size)
+        }
+        scaleMode = .aspectFit
+        if size != Self.classicLogicalArenaSize {
+            size = Self.classicLogicalArenaSize
+        }
+    }
+
+    private func restoreHostSceneSizing() {
+        guard let previous = preClassicSceneSizing else { return }
+        preClassicSceneSizing = nil
+        scaleMode = previous.scaleMode
+        size = view?.bounds.size ?? previous.size
+    }
+
     private func clearGameEntitiesKeepOptions() {
         for ast in activeAsteroids {
             ast.removeFromParent()
@@ -3420,10 +3471,7 @@ public final class GameScene: SKScene {
 
     public override func didChangeSize(_ oldSize: CGSize) {
         super.didChangeSize(oldSize)
-        let halfWidth = size.width / 2
-        let halfHeight = size.height / 2
-        scoreLabel.position = CGPoint(x: -halfWidth + 20, y: halfHeight - 40)
-        hiScoreLabel.position = CGPoint(x: halfWidth - 20, y: halfHeight - 40)
+        applyStandardHUDLayout()
         // iOS-Breitformat: kompaktes Menü-Layout nach Größenänderung neu setzen.
         refreshCompactLayoutForCurrentState()
     }

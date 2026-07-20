@@ -183,6 +183,9 @@ public final class Ship: SKShapeNode {
     /// bisherigen Exploids-Werte vollständig wiederhergestellt.
     func applyClassicProfile(_ enabled: Bool) {
         usesClassicAppearance = enabled
+        // Die vorhandene Exploids-Kontur ist 30×20 Punkte groß. Gleichmäßige 0,8-Skalierung
+        // ergibt exakt Ataris 24×16-Mittellinien-Hüllkurve und hält die Kollisionsfläche synchron.
+        setScale(enabled ? ClassicGeometry.shipBodyScale : 1.0)
         if enabled {
             strokeColor = .white
             flameNode.strokeColor = .white

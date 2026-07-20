@@ -48,6 +48,9 @@ final class GameViewController: UIViewController {
         // Renderpräferenz und bleibt bewusst unabhängig vom festen Simulationszeitschritt.
         skView.preferredFramesPerSecond = 120
         skView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        // Classic rendert seine feste 4:3-Arena per aspectFit. Freie Flächen auf breiten Geräten
+        // bleiben dadurch garantiert schwarz und zeigen keinen UIKit-Standardhintergrund.
+        skView.backgroundColor = .black
         self.view = skView
     }
 

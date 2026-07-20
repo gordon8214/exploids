@@ -6,11 +6,21 @@ import SpriteKit
 
 extension GameScene {
     // MARK: - UI Configuration
-    
-    func setupUIElements() {
+
+    /// Hält das Desktop-HUD an den aktuellen Szenengrenzen. Dieselbe Berechnung wird beim ersten
+    /// Aufbau und nach jedem Größenwechsel verwendet, damit beim Umschalten auf die feste
+    /// Classic-Arena keine Labels an Koordinaten der vorherigen Host-Größe zurückbleiben.
+    func applyStandardHUDLayout() {
         let halfWidth = size.width / 2
         let halfHeight = size.height / 2
-        
+        scoreLabel.position = CGPoint(x: -halfWidth + 20, y: halfHeight - 40)
+        hiScoreLabel.position = CGPoint(x: halfWidth - 20, y: halfHeight - 40)
+        timerLabel.position = CGPoint(x: 0, y: halfHeight - 40)
+        levelLabel.position = CGPoint(x: -halfWidth + 20, y: halfHeight - 65)
+        livesLabel.position = CGPoint(x: -halfWidth + 20, y: halfHeight - 90)
+    }
+
+    func setupUIElements() {
         // Power-Up Notification HUD Alert
         powerUpNotificationLabel.fontSize = 24
         powerUpNotificationLabel.horizontalAlignmentMode = .center
@@ -50,7 +60,6 @@ extension GameScene {
         scoreLabel.fontSize = 20
         scoreLabel.fontColor = .cyan
         scoreLabel.horizontalAlignmentMode = .left
-        scoreLabel.position = CGPoint(x: -halfWidth + 20, y: halfHeight - 40)
         scoreLabel.zPosition = 100
         scoreLabel.isHidden = true
         self.addChild(scoreLabel)
@@ -58,7 +67,6 @@ extension GameScene {
         hiScoreLabel.fontSize = 20
         hiScoreLabel.fontColor = SKColor(red: 1.0, green: 0.75, blue: 0.0, alpha: 1.0)
         hiScoreLabel.horizontalAlignmentMode = .right
-        hiScoreLabel.position = CGPoint(x: halfWidth - 20, y: halfHeight - 40)
         hiScoreLabel.zPosition = 100
         hiScoreLabel.isHidden = true
         self.addChild(hiScoreLabel)
@@ -67,7 +75,6 @@ extension GameScene {
         timerLabel.fontSize = 20
         timerLabel.fontColor = .white
         timerLabel.horizontalAlignmentMode = .center
-        timerLabel.position = CGPoint(x: 0, y: halfHeight - 40)
         timerLabel.zPosition = 100
         timerLabel.isHidden = true
         self.addChild(timerLabel)
@@ -76,7 +83,6 @@ extension GameScene {
         levelLabel.fontSize = 16
         levelLabel.fontColor = .cyan
         levelLabel.horizontalAlignmentMode = .left
-        levelLabel.position = CGPoint(x: -halfWidth + 20, y: halfHeight - 65)
         levelLabel.zPosition = 100
         levelLabel.isHidden = true
         self.addChild(levelLabel)
@@ -85,10 +91,11 @@ extension GameScene {
         livesLabel.fontSize = 16
         livesLabel.fontColor = SKColor(red: 1.0, green: 0.3, blue: 0.45, alpha: 1.0)
         livesLabel.horizontalAlignmentMode = .left
-        livesLabel.position = CGPoint(x: -halfWidth + 20, y: halfHeight - 90)
         livesLabel.zPosition = 100
         livesLabel.isHidden = true
         self.addChild(livesLabel)
+
+        applyStandardHUDLayout()
 
         // Laserbeam-Visual (Polylinie, pro Frame neu aufgebaut; additives Leuchten)
         beamNode.strokeColor = SKColor(red: 0.4, green: 1.0, blue: 0.4, alpha: 0.95)

@@ -66,24 +66,7 @@ public final class UFO: SKShapeNode {
         self.fireCooldown = isSmall ? 1.5 : 2.2
         super.init()
         
-        // Setup scaling and vertices
-        let scale: CGFloat = isSmall ? 0.6 : 1.2
-        self.vertices = baseVertices.map { CGPoint(x: $0.x * scale, y: $0.y * scale) }
-        
-        // Setup shape path
-        let ufoPath = CGMutablePath()
-        if let first = vertices.first {
-            ufoPath.move(to: first)
-            for pt in vertices.dropFirst() {
-                ufoPath.addLine(to: pt)
-            }
-            ufoPath.closeSubpath()
-            
-            // Draw secondary cockpit dome line
-            ufoPath.move(to: CGPoint(x: -10 * scale, y: 3 * scale))
-            ufoPath.addLine(to: CGPoint(x: 10 * scale, y: 3 * scale))
-        }
-        self.path = ufoPath
+        configureStandardGeometry()
         
         // Colors: Large is green, Small is hot pink/orange
         if isSmall {
@@ -109,6 +92,55 @@ public final class UFO: SKShapeNode {
             x: startOnLeft ? speedX : -speedX,
             y: 0.0
         )
+    }
+
+    private func configureStandardGeometry() {
+        let scale: CGFloat = isSmall ? 0.6 : 1.2
+        let outline = baseVertices.map { CGPoint(x: $0.x * scale, y: $0.y * scale) }
+        configureGeometry(
+            outline: outline,
+            cockpitStart: CGPoint(x: -10.0 * scale, y: 3.0 * scale),
+            cockpitEnd: CGPoint(x: 10.0 * scale, y: 3.0 * scale)
+        )
+    }
+
+    /// Behält die eigenständig entworfene Exploids-Kontur, bildet deren Hüllkurve aber exakt auf
+    /// Ataris 40×24 bzw. 20×12 Mittellinienmaße ab. Der Versatz um das Quellzentrum verhindert,
+    /// dass die asymmetrische Quell-Y-Spanne (-7…8) die Arcade-Kontur aus der Knotenmitte schiebt.
+    private func configureClassicGeometry() {
+        let targetSize = isSmall ? ClassicGeometry.smallSaucerSize : ClassicGeometry.largeSaucerSize
+        guard let minX = baseVertices.map(\.x).min(),
+              let maxX = baseVertices.map(\.x).max(),
+              let minY = baseVertices.map(\.y).min(),
+              let maxY = baseVertices.map(\.y).max(),
+              maxX > minX, maxY > minY else { return }
+
+        let sourceCenter = CGPoint(x: (minX + maxX) / 2.0, y: (minY + maxY) / 2.0)
+        let scaleX = targetSize.width / (maxX - minX)
+        let scaleY = targetSize.height / (maxY - minY)
+        func transform(_ point: CGPoint) -> CGPoint {
+            CGPoint(x: (point.x - sourceCenter.x) * scaleX,
+                    y: (point.y - sourceCenter.y) * scaleY)
+        }
+
+        configureGeometry(
+            outline: baseVertices.map(transform),
+            cockpitStart: transform(CGPoint(x: -10.0, y: 3.0)),
+            cockpitEnd: transform(CGPoint(x: 10.0, y: 3.0))
+        )
+    }
+
+    private func configureGeometry(outline: [CGPoint], cockpitStart: CGPoint, cockpitEnd: CGPoint) {
+        vertices = outline
+        let ufoPath = CGMutablePath()
+        if let first = outline.first {
+            ufoPath.move(to: first)
+            outline.dropFirst().forEach { ufoPath.addLine(to: $0) }
+            ufoPath.closeSubpath()
+            ufoPath.move(to: cockpitStart)
+            ufoPath.addLine(to: cockpitEnd)
+        }
+        path = ufoPath
     }
     
     /// Convenience-Initializer ohne Seed für Tests/Helfer — würfelt aus dem System-RNG.
@@ -206,6 +238,7 @@ public final class UFO: SKShapeNode {
     /// Aktiviert die weiße, ungefüllte Arcade-Darstellung und die rein horizontale Grundbewegung.
     func applyClassicBehavior(startOnLeft: Bool, currentTime: TimeInterval) {
         usesClassicBehavior = true
+        configureClassicGeometry()
         strokeColor = .white
         fillColor = .clear
         lineWidth = 1.8

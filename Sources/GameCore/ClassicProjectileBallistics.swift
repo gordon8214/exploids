@@ -39,7 +39,7 @@ enum ClassicProjectileCalibrator {
     static let arcadeFramesPerSecond: TimeInterval = 62.5
     static let displayFrameDuration: TimeInterval = 1.0 / arcadeFramesPerSecond
     static let fixedPointScale: CGFloat = 8.0
-    static let canonicalArenaSize = CGSize(width: 1024.0, height: 768.0)
+    static let canonicalArenaSize = ClassicGeometry.logicalArenaSize
     static let saucerMovementFrames = 69
 
     private static let angleCount = 256

@@ -6,6 +6,111 @@ import SpriteKit
 final class ClassicModeTests: GameCoreTestCase {
     private let arenaSize = CGSize(width: 800, height: 600)
 
+    func testClassicEntityCenterlineBoundsMatchAtariRev4() {
+        let (scene, view) = makeClassicScene(seed: 0x51_2E)
+        _ = view
+        assertOutline(scene.ship.getWorldVertices(), hasSize: CGSize(width: 24, height: 16))
+
+        for isSmall in [false, true] {
+            var rng = GameRandom(seed: isSmall ? 0x5A11 : 0x1A26E)
+            let saucer = UFO(isSmall: isSmall, startOnLeft: true,
+                              screenSize: GameScene.classicLogicalArenaSize, using: &rng)
+            saucer.position = .zero
+            saucer.applyClassicBehavior(startOnLeft: true, currentTime: 0)
+            assertOutline(saucer.getWorldVertices(),
+                          hasSize: isSmall ? CGSize(width: 20, height: 12)
+                                           : CGSize(width: 40, height: 24))
+        }
+
+        let asteroidSizes: [(Asteroid.AsteroidSize, CGFloat)] = [
+            (.large, 64), (.medium, 32), (.small, 16)
+        ]
+        for (sizeClass, expectedDiameter) in asteroidSizes {
+            for family in 0..<4 {
+                let asteroid = Asteroid(sizeClass: sizeClass)
+                asteroid.position = .zero
+                asteroid.zRotation = 0
+                asteroid.applyClassicAppearance(family: family)
+                assertOutline(asteroid.getWorldVertices(),
+                              hasSize: CGSize(width: expectedDiameter, height: expectedDiameter))
+            }
+        }
+    }
+
+    func testClassicUsesFixedLogicalArenaAndUniformlyScalesAcrossViewSizes() {
+        let viewSizes = [
+            CGSize(width: 1024, height: 768),
+            CGSize(width: 1728, height: 1084),
+            CGSize(width: 874, height: 402)
+        ]
+
+        for viewSize in viewSizes {
+            let scene = GameScene(size: viewSize)
+            scene.scaleMode = .resizeFill
+            let view = SKView(frame: CGRect(origin: .zero, size: viewSize))
+            view.presentScene(scene)
+            scene.externalStepDriving = true
+            scene.startNewGameForTesting(seed: 0xA7A21, mode: .classicAsteroids)
+
+            XCTAssertEqual(scene.size, GameScene.classicLogicalArenaSize)
+            XCTAssertEqual(scene.scaleMode, .aspectFit)
+            XCTAssertEqual(scene.levelLabel.position, CGPoint(x: -492, y: 319),
+                           "WAVE-HUD muss nach Eintritt aus \(viewSize) in der Classic-Arena liegen")
+            XCTAssertEqual(scene.livesLabel.position, CGPoint(x: -492, y: 294),
+                           "SHIPS-HUD muss nach Eintritt aus \(viewSize) in der Classic-Arena liegen")
+            XCTAssertFalse(scene.levelLabel.isHidden)
+            XCTAssertFalse(scene.livesLabel.isHidden)
+
+            let origin = view.convert(.zero, from: scene)
+            let horizontal = view.convert(CGPoint(x: 100, y: 0), from: scene)
+            let vertical = view.convert(CGPoint(x: 0, y: 100), from: scene)
+            let scaleX = abs(horizontal.x - origin.x) / 100.0
+            let scaleY = abs(vertical.y - origin.y) / 100.0
+            XCTAssertEqual(scaleX, scaleY, accuracy: 0.000_001,
+                           "Classic darf bei \(viewSize) nicht verzerrt werden")
+
+            let resized = CGSize(width: viewSize.width + 137, height: viewSize.height + 59)
+            view.frame = CGRect(origin: .zero, size: resized)
+            XCTAssertEqual(scene.size, GameScene.classicLogicalArenaSize,
+                           "Ein Host-Resize darf die logische Classic-Arena nicht verändern")
+
+            scene.transitionTo(.startScreen)
+            XCTAssertEqual(scene.scaleMode, .resizeFill)
+            XCTAssertEqual(scene.size, resized,
+                           "Nach Classic muss das Menü die aktuelle Host-Größe wieder übernehmen")
+        }
+    }
+
+    func testAncientAndMadKeepAdaptiveSceneSizing() {
+        for mode in [GameMode.ancientAsteroids, .madMeteoroids] {
+            let viewport = CGSize(width: 1337, height: 701)
+            let scene = GameScene(size: viewport)
+            scene.scaleMode = .resizeFill
+            let view = SKView(frame: CGRect(origin: .zero, size: viewport))
+            view.presentScene(scene)
+            scene.startNewGameForTesting(seed: 0xADA971, mode: mode)
+
+            XCTAssertEqual(scene.scaleMode, .resizeFill)
+            XCTAssertEqual(scene.size, viewport)
+        }
+    }
+
+    func testClassicMenuRestoresNonAdaptiveHostModeAtCurrentViewBounds() {
+        let initialViewport = CGSize(width: 900, height: 700)
+        let scene = GameScene(size: initialViewport)
+        scene.scaleMode = .fill
+        let view = SKView(frame: CGRect(origin: .zero, size: initialViewport))
+        view.presentScene(scene)
+        scene.startNewGameForTesting(seed: 0xB0A2D5, mode: .classicAsteroids)
+
+        let resizedViewport = CGSize(width: 1200, height: 500)
+        view.frame = CGRect(origin: .zero, size: resizedViewport)
+        scene.transitionTo(.startScreen)
+
+        XCTAssertEqual(scene.scaleMode, .fill)
+        XCTAssertEqual(scene.size, resizedViewport)
+    }
+
     func testThreeWayModeSelectionRemembersStandardLevelAndForcesClassicWaveOne() {
         let (scene, view) = makeScene()
         _ = view
@@ -239,7 +344,7 @@ final class ClassicModeTests: GameCoreTestCase {
         let expected = ClassicProjectileCalibrator.calibrate(
             angle: scene.ship.zRotation,
             shooterVelocity: scene.ship.velocity,
-            arenaSize: arenaSize,
+            arenaSize: scene.size,
             movementFrames: ClassicProjectileCalibrator.playerMovementFrames(forLaunchPhase: 0)
         )
 
@@ -637,7 +742,7 @@ final class ClassicModeTests: GameCoreTestCase {
         scene.advanceOneStep()
 
         let replay = scene.currentReplayForTesting()
-        XCTAssertEqual(Replay.currentLogicVersion, 7)
+        XCTAssertEqual(Replay.currentLogicVersion, 8)
         XCTAssertEqual(replay?.gameMode.rawValue, 2)
         XCTAssertEqual(replay?.startLevel, 1)
         XCTAssertEqual(replay?.autoFire, false)
@@ -874,6 +979,7 @@ final class ClassicModeTests: GameCoreTestCase {
 
     private func makeScene() -> (GameScene, SKView) {
         let scene = GameScene(size: arenaSize)
+        scene.scaleMode = .resizeFill
         let view = SKView(frame: CGRect(origin: .zero, size: arenaSize))
         view.presentScene(scene)
         scene.externalStepDriving = true
@@ -894,6 +1000,18 @@ final class ClassicModeTests: GameCoreTestCase {
         asteroid.velocity = velocity
         asteroid.hasEnteredScreen = true
         return asteroid
+    }
+
+    private func assertOutline(_ points: [CGPoint], hasSize expected: CGSize,
+                               file: StaticString = #filePath, line: UInt = #line) {
+        guard let minX = points.map(\.x).min(), let maxX = points.map(\.x).max(),
+              let minY = points.map(\.y).min(), let maxY = points.map(\.y).max() else {
+            return XCTFail("Leere Vektorkontur", file: file, line: line)
+        }
+        XCTAssertEqual(maxX - minX, expected.width, accuracy: 0.000_001,
+                       file: file, line: line)
+        XCTAssertEqual(maxY - minY, expected.height, accuracy: 0.000_001,
+                       file: file, line: line)
     }
 
     private func addFarClassicAsteroids(_ count: Int, to scene: GameScene) {

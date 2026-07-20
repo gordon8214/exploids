@@ -281,6 +281,12 @@ public final class Asteroid: SKShapeNode {
                                   y: sin(angle) * radius * clamped))
         }
 
+        // Jede eigenständig entworfene Familie auf dieselbe Rev.-4-Hüllkurve normieren. X und Y
+        // werden getrennt zentriert, damit alle vier unregelmäßigen Konturen exakt 64/32/16 Punkte
+        // messen und ihre sichtbare Form zugleich die Kollisionsform bleibt.
+        let halfExtent = ClassicGeometry.asteroidDiameter(for: sizeClass) / 2.0
+        points = normalizedClassicOutline(points, halfExtent: halfExtent)
+
         vertices = points
         let outline = CGMutablePath()
         if let first = points.first {
@@ -295,6 +301,23 @@ public final class Asteroid: SKShapeNode {
         lineJoin = .miter
         wireframeNode.isHidden = true
         VectorGlowRenderer.markStroke(self)
+    }
+
+    private func normalizedClassicOutline(_ points: [CGPoint], halfExtent: CGFloat) -> [CGPoint] {
+        guard let minX = points.map(\.x).min(),
+              let maxX = points.map(\.x).max(),
+              let minY = points.map(\.y).min(),
+              let maxY = points.map(\.y).max(),
+              maxX > minX, maxY > minY else { return points }
+
+        let centerX = (minX + maxX) / 2.0
+        let centerY = (minY + maxY) / 2.0
+        let scaleX = (halfExtent * 2.0) / (maxX - minX)
+        let scaleY = (halfExtent * 2.0) / (maxY - minY)
+        return points.map { point in
+            CGPoint(x: (point.x - centerX) * scaleX,
+                    y: (point.y - centerY) * scaleY)
+        }
     }
     
     private func updateWireframePath() {

@@ -286,9 +286,9 @@ struct Main {
               --render-replay <file> --out <gif> [--scale S] [--sim-scale S] [--fps N] [--stride N]
                                        [--from F] [--max-frames N] [--auto-fire] [--show-hud]
                             Headlessly render a replay file to an animated GIF (no window). The sim runs
-                            at the recorded scene size by default (--sim-scale overrides); --scale sets the
-                            GIF output size. Default output 480x360, fps 30, stride auto (real-time), HUD
-                            hidden. --from picks a start frame (segment of a long run).
+                            at the recorded scene size by default (--sim-scale overrides Ancient/Mad;
+                            Classic is always 1024x768); --scale sets the GIF output size. Default output
+                            480x360, fps 30, stride auto (real-time), HUD hidden. --from picks a start frame.
               --render-last-replay --out <gif> [same options as --render-replay]
                             Render the newest archived replay (the last game played) to a GIF. Replays
                             are auto-saved to ~/Library/Application Support/Exploids/replays on game over.
@@ -440,10 +440,21 @@ struct Main {
         do {
             let data = try Data(contentsOf: URL(fileURLWithPath: arguments[flagIndex + 1]))
             let replay = try Replay(data: data)
-            // Szenengröße beeinflusst die Simulation (Spawns/Wrap/Bounds) → für treue Wiedergabe die in
-            // der Aufnahme gespeicherte Größe nehmen; --width/--height überschreiben.
-            let w = argValue(arguments, "--width").flatMap { Int($0) } ?? replay.width
-            let h = argValue(arguments, "--height").flatMap { Int($0) } ?? replay.height
+            if replay.gameMode == .classicAsteroids,
+               arguments.contains("--width") || arguments.contains("--height") {
+                FileHandle.standardError.write(Data(
+                    "Fehler: Classic verwendet immer die feste Simulationsgröße 1024x768; --width/--height sind dafür nicht zulässig.\n".utf8
+                ))
+                exit(2)
+            }
+            // Ancient/Mad brauchen die Aufnahmegröße; Classic wird unabhängig vom Host immer in
+            // der gemeinsamen Rev.-4-Arena verifiziert.
+            let w = replay.gameMode == .classicAsteroids
+                ? Int(GameScene.classicLogicalArenaSize.width)
+                : (argValue(arguments, "--width").flatMap { Int($0) } ?? replay.width)
+            let h = replay.gameMode == .classicAsteroids
+                ? Int(GameScene.classicLogicalArenaSize.height)
+                : (argValue(arguments, "--height").flatMap { Int($0) } ?? replay.height)
             let view = SKView(frame: CGRect(x: 0, y: 0, width: w, height: h))
             let scene = GameScene(size: CGSize(width: w, height: h))
             view.presentScene(scene)
@@ -575,7 +586,8 @@ struct Main {
             options.width = Int(scale)
             options.height = Int(scale * 3.0 / 4.0)
         }
-        // --sim-scale: Simulationsgröße (muss der Aufnahme entsprechen). Für Fenster-Aufnahmen 1024.
+        // --sim-scale: optionale Simulationsgröße für Ancient/Mad. Classic lehnt den Override nach
+        // dem Einlesen der Aufnahme ab, weil seine Arena unveränderlich 1024×768 ist.
         if let s = argValue(arguments, "--sim-scale"), let sim = Int(s), sim > 0 {
             options.simWidth = sim; options.simHeight = sim * 3 / 4
         }
@@ -592,6 +604,12 @@ struct Main {
             let replay = try Replay(data: data)
             guard replay.isCompatible else {
                 FileHandle.standardError.write(Data("Fehler: Aufnahme gehört zu einer anderen Logik-Version (inkompatibel).\n".utf8)); exit(3)
+            }
+            if replay.gameMode == .classicAsteroids, arguments.contains("--sim-scale") {
+                FileHandle.standardError.write(Data(
+                    "Fehler: Classic verwendet immer die feste Simulationsgröße 1024x768; --sim-scale ist dafür nicht zulässig.\n".utf8
+                ))
+                exit(2)
             }
             try ReplayRenderer.renderToGIF(replay, outputURL: URL(fileURLWithPath: outPath), options: options)
             print("GIF gerendert: \(outPath)")
@@ -615,6 +633,12 @@ struct Main {
             let replay = try Replay(data: try Data(contentsOf: URL(fileURLWithPath: arguments[flagIndex + 1])))
             guard replay.isCompatible else {
                 FileHandle.standardError.write(Data("Fehler: Aufnahme inkompatibel (andere Logik-Version).\n".utf8)); exit(3)
+            }
+            if replay.gameMode == .classicAsteroids, arguments.contains("--sim-scale") {
+                FileHandle.standardError.write(Data(
+                    "Fehler: Classic verwendet immer die feste Simulationsgröße 1024x768; --sim-scale ist dafür nicht zulässig.\n".utf8
+                ))
+                exit(2)
             }
             var options = ReplayRenderer.Options()
             // Video-Defaults: ganzes Replay, Ausgabe = Aufnahme-Größe (1:1, scharf), 30 fps, HUD AN

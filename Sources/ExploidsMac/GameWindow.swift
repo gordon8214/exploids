@@ -50,6 +50,10 @@ public final class GameWindow: NSWindow, @preconcurrency SKViewDelegate, NSWindo
 
         // Initialize SKView to enable SpriteKit rendering
         gameView.autoresizingMask = [.width, .height]
+        // `.aspectFit` lässt im Classic-Modus bei Nicht-4:3-Fenstern freie Randflächen. Diese
+        // explizit schwarz halten, statt vom Fenster-/Layer-Default abhängig zu sein.
+        gameView.wantsLayer = true
+        gameView.layer?.backgroundColor = NSColor.black.cgColor
 
         // Show diagnostic overlays for development verification
         gameView.showsFPS = true
