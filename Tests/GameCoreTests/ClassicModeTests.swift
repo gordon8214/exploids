@@ -236,36 +236,111 @@ final class ClassicModeTests: GameCoreTestCase {
                        "Auch das Spielerschiff selbst kann im Arcade-Regelsatz Felsenpunkte erzielen")
     }
 
-    func testClassicSmallSaucerWaitsBeforeFirstShotAcrossSceneSizes() {
+    func testClassicSaucerTypesShareArcadeMovementSpeed() {
+        for startOnLeft in [true, false] {
+            var largeRNG = GameRandom(seed: 0x1A26E)
+            var smallRNG = GameRandom(seed: 0x5A11)
+            let large = UFO(isSmall: false, startOnLeft: startOnLeft,
+                            screenSize: arenaSize, using: &largeRNG)
+            let small = UFO(isSmall: true, startOnLeft: startOnLeft,
+                            screenSize: arenaSize, using: &smallRNG)
+
+            large.applyClassicBehavior(startOnLeft: startOnLeft, currentTime: 0)
+            small.applyClassicBehavior(startOnLeft: startOnLeft, currentTime: 0)
+
+            XCTAssertEqual(large.velocity, small.velocity,
+                           "Atari bewegt kleine und große Untertassen gleich schnell")
+            XCTAssertEqual(abs(large.velocity.x), 120.0, accuracy: 0.000_001)
+            XCTAssertEqual(large.velocity.y, 0.0, accuracy: 0.000_001)
+        }
+    }
+
+    func testClassicSaucerTypesShareAtariFireTimingAcrossSceneSizes() {
         let cases: [(size: CGSize, seed: UInt64)] = [
             (CGSize(width: 1024, height: 768), 0x51),
             (CGSize(width: 1728, height: 1084), 0x52)
         ]
+        let fireInterval = 10.0 * 4.0 / 60.0
 
         for testCase in cases {
-            var rng = GameRandom(seed: testCase.seed)
-            let saucer = UFO(isSmall: true, startOnLeft: true,
-                              screenSize: testCase.size, using: &rng)
-            let startTime = 10.0
-            saucer.applyClassicBehavior(startOnLeft: true, currentTime: startTime)
+            for isSmall in [false, true] {
+                var rng = GameRandom(seed: testCase.seed)
+                let saucer = UFO(isSmall: isSmall, startOnLeft: true,
+                                  screenSize: testCase.size, using: &rng)
+                let startTime = 10.0
+                saucer.applyClassicBehavior(startOnLeft: true, currentTime: startTime)
 
-            XCTAssertNil(saucer.shootClassic(target: .zero, score: 35_000,
-                                              currentTime: startTime, using: &rng))
-            XCTAssertNil(saucer.shootClassic(
-                target: .zero,
-                score: 35_000,
-                currentTime: startTime + ClassicTuning.saucerHoldFireDuration - GameScene.simStep,
-                using: &rng
+                XCTAssertNil(saucer.shootClassic(target: .zero, score: 35_000,
+                                                  currentTime: startTime, using: &rng))
+                XCTAssertNil(saucer.shootClassic(
+                    target: .zero,
+                    score: 35_000,
+                    currentTime: startTime + ClassicTuning.saucerHoldFireDuration - GameScene.simStep,
+                    using: &rng
+                ))
+
+                let firstFireTime = startTime + ClassicTuning.saucerHoldFireDuration
+                XCTAssertNotNil(saucer.shootClassic(target: .zero, score: 35_000,
+                                                     currentTime: firstFireTime, using: &rng))
+                XCTAssertNil(saucer.shootClassic(target: .zero, score: 35_000,
+                                                  currentTime: firstFireTime + fireInterval
+                                                      - GameScene.simStep,
+                                                  using: &rng))
+                XCTAssertNotNil(saucer.shootClassic(target: .zero, score: 35_000,
+                                                     currentTime: firstFireTime + fireInterval,
+                                                     using: &rng))
+            }
+        }
+    }
+
+    func testClassicSaucerShotsUseAtariBallisticsAndAccuracyBands() throws {
+        let target = CGPoint(x: 400, y: 140)
+        let angleStep = 2.0 * CGFloat.pi / 256.0
+
+        for isSmall in [false, true] {
+            var constructionRNG = GameRandom(seed: isSmall ? 0x5A11 : 0x1A26E)
+            let saucer = UFO(isSmall: isSmall, startOnLeft: true,
+                              screenSize: arenaSize, using: &constructionRNG)
+            saucer.position = .zero
+            saucer.applyClassicBehavior(startOnLeft: true, currentTime: 0)
+            saucer.velocity = CGPoint(x: 120, y: -120)
+            var shotRNG = GameRandom(seed: 0xA7A21)
+
+            let shot = try XCTUnwrap(saucer.shootClassic(
+                target: target,
+                score: 0,
+                currentTime: ClassicTuning.saucerHoldFireDuration,
+                using: &shotRNG
             ))
+            let launchVelocity = CGPoint(x: shot.velocity.x - saucer.velocity.x,
+                                         y: shot.velocity.y - saucer.velocity.y)
 
-            let firstFireTime = startTime + ClassicTuning.saucerHoldFireDuration
-            XCTAssertNotNil(saucer.shootClassic(target: .zero, score: 35_000,
-                                                 currentTime: firstFireTime, using: &rng))
-            XCTAssertNil(saucer.shootClassic(target: .zero, score: 35_000,
-                                              currentTime: firstFireTime + 0.67 - GameScene.simStep,
-                                              using: &rng))
-            XCTAssertNotNil(saucer.shootClassic(target: .zero, score: 35_000,
-                                                 currentTime: firstFireTime + 0.67, using: &rng))
+            XCTAssertEqual(hypot(launchVelocity.x, launchVelocity.y), 480.0, accuracy: 0.000_001)
+            XCTAssertEqual(shot.lifetime, 1.2, accuracy: 0.000_001)
+        }
+
+        for (score, allowedRange) in [(0, -16...15), (35_000, -7...8)] {
+            var constructionRNG = GameRandom(seed: 0x5A11)
+            let saucer = UFO(isSmall: true, startOnLeft: true,
+                              screenSize: arenaSize, using: &constructionRNG)
+            saucer.position = .zero
+            saucer.applyClassicBehavior(startOnLeft: true, currentTime: 0)
+            saucer.velocity = .zero
+            var shotRNG = GameRandom(seed: 0xACC02A7E)
+
+            let shot = try XCTUnwrap(saucer.shootClassic(
+                target: target,
+                score: score,
+                currentTime: ClassicTuning.saucerHoldFireDuration,
+                using: &shotRNG
+            ))
+            let ideal = atan2(target.y, target.x)
+            let errorUnits = normalizedAngle(shot.zRotation - ideal) / angleStep
+            let roundedErrorUnits = errorUnits.rounded()
+
+            XCTAssertEqual(errorUnits, roundedErrorUnits, accuracy: 0.000_001,
+                           "Ataris Zielabweichung verwendet diskrete 1/256-Kreis-Schritte")
+            XCTAssertTrue(allowedRange.contains(Int(roundedErrorUnits)))
         }
     }
 
@@ -431,7 +506,7 @@ final class ClassicModeTests: GameCoreTestCase {
         scene.advanceOneStep()
 
         let replay = scene.currentReplayForTesting()
-        XCTAssertEqual(Replay.currentLogicVersion, 4)
+        XCTAssertEqual(Replay.currentLogicVersion, 5)
         XCTAssertEqual(replay?.gameMode.rawValue, 2)
         XCTAssertEqual(replay?.startLevel, 1)
         XCTAssertEqual(replay?.autoFire, false)
@@ -525,15 +600,23 @@ final class ClassicModeTests: GameCoreTestCase {
         firingSaucer.position = CGPoint(x: -300, y: 250)
         scene.addChild(firingSaucer)
         scene.activeUFOs.append(firingSaucer)
+        var existingShots: [Laser] = []
         for x in [-320.0, 320.0] {
             let existing = Laser(position: CGPoint(x: x, y: -250), angle: 0,
                                  type: .enemy, speed: 0, lifetime: 1)
             existing.applyClassicAppearance()
             scene.addLaserForTesting(existing)
+            existingShots.append(existing)
         }
         scene.advanceOneStep()
-        XCTAssertEqual(scene.activeLasers.filter { $0.type == .enemy }.count, 3,
-                       "Classic erlaubt höchstens drei Untertassen-Schüsse gleichzeitig")
+        XCTAssertEqual(scene.activeLasers.filter { $0.type == .enemy }.count, 2,
+                       "Die zwei Arcade-Slots müssen einen dritten Untertassen-Schuss blockieren")
+
+        existingShots[0].removeFromParent()
+        scene.activeLasers.removeAll { $0 === existingShots[0] }
+        scene.advanceOneStep()
+        XCTAssertEqual(scene.activeLasers.filter { $0.type == .enemy }.count, 1,
+                       "Ein blockierter Schuss setzt Ataris Feuerzähler trotzdem zurück")
     }
 
     func testClassicLeaderboardIsSeparateAndSelectsItsOwnReplay() throws {

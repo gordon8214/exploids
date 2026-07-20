@@ -9,9 +9,25 @@ enum ClassicTuning {
     static let playerShotLifetime: TimeInterval = 0.8
     static let playerShotSpeed: CGFloat = 480.0
     static let safeRespawnRadius: CGFloat = 105.0
+    /// Das Original nutzt für beide Untertassengrößen XINC = +/-$10. Mit drei
+    /// Nachkommabits sind das 2 von 1024 Spielfeldeinheiten pro 60-Hz-Frame.
+    static let saucerSpeed: CGFloat = 120.0
+    /// Der globale 60-Hz-Zähler wechselt den Vertikalkurs bei $00/$80.
+    static let saucerCourseInterval: TimeInterval = 128.0 / 60.0
     /// Atari Rev. 2 setzte den ersten Untertassen-Schusszähler auf 18 und wertete ihn nur jeden
     /// vierten 60-Hz-Frame aus: 18 * 4 / 60 = 1,2 Sekunden Reaktionszeit.
     static let saucerHoldFireDuration: TimeInterval = 18.0 * 4.0 / 60.0
+    /// Nachfolgende Schüsse nutzen denselben Vier-Frame-Takt mit einem Zählerstand von zehn.
+    static let saucerFireInterval: TimeInterval = 10.0 * 4.0 / 60.0
+    /// Saucer- und Spielerschüsse teilen im Arcadecode denselben Grundvektor; die Eigenbewegung
+    /// des Schützen wird anschließend addiert.
+    static let saucerShotSpeed = playerShotSpeed
+    static let saucerShotLifetime: TimeInterval = 18.0 * 4.0 / 60.0
+    /// Die Objektslots 2 und 3 sind für Untertassenschüsse reserviert; 4...7 gehören dem Spieler.
+    static let maximumSaucerShots = 2
+    /// Beim Zielen zieht der Arcadecode 32 Bewegungsframes vom Abstand ab, bevor er den Winkel bildet.
+    static let saucerAimCompensationDuration: TimeInterval = 32.0 / 60.0
+    static let angleStep: CGFloat = 2.0 * .pi / 256.0
 
     static func largeAsteroidCount(for wave: Int) -> Int {
         switch wave {
@@ -422,9 +438,14 @@ extension GameScene {
         var survivors: [UFO] = []
         for ufo in activeUFOs {
             if currentTime >= ufo.classicNextCourseChange {
-                let courses: [CGFloat] = [-85.0, 0.0, 0.0, 85.0]
+                let courses: [CGFloat] = [
+                    -ClassicTuning.saucerSpeed,
+                    0.0,
+                    0.0,
+                    ClassicTuning.saucerSpeed
+                ]
                 ufo.velocity.y = courses[Int.random(in: 0..<courses.count, using: &rng)]
-                ufo.classicNextCourseChange = currentTime + 2.13
+                ufo.classicNextCourseChange = currentTime + ClassicTuning.saucerCourseInterval
             }
             ufo.update(deltaTime: deltaTime)
             let halfHeight = size.height / 2.0
@@ -434,12 +455,16 @@ extension GameScene {
             let enemyShotCount = activeLasers.reduce(into: 0) { count, laser in
                 if laser.type != .normal { count += 1 }
             }
-            if classicSession.isShipActive, !ship.isHidden, enemyShotCount < 3,
-               let shot = ufo.shootClassic(target: ship.position, score: score,
-                                           currentTime: currentTime, using: &rng) {
-                addChild(shot)
-                activeLasers.append(shot)
-                SoundManager.shared.playClassicSaucerFire()
+            if classicSession.isShipActive, !ship.isHidden {
+                // Atari setzt den Feuerzähler und verbraucht den Ziel-Zufall auch dann, wenn beide
+                // Untertassen-Projektilslots belegt sind. Der fertige Schuss wird dann verworfen.
+                let shot = ufo.shootClassic(target: ship.position, score: score,
+                                            currentTime: currentTime, using: &rng)
+                if enemyShotCount < ClassicTuning.maximumSaucerShots, let shot {
+                    addChild(shot)
+                    activeLasers.append(shot)
+                    SoundManager.shared.playClassicSaucerFire()
+                }
             }
 
             if ufo.isExited(screenSize: size) {

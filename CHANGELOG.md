@@ -2,6 +2,21 @@
 
 All notable changes to Exploids. Dates are ISO 8601 (YYYY-MM-DD).
 
+## [0.16.6] — 2026-07-19
+
+**For players:**
+- Classic large and small saucers now share the original arcade movement speed. Both use the same
+  firing cadence; the large saucer fires randomly, while the small one aims with the original
+  deliberately imperfect accuracy bands and becomes more accurate at 35,000 points.
+- Classic saucer fire now matches the arcade ballistics more closely: at most two enemy shots can be
+  active, their base speed and lifetime match the source values, and each shot inherits its saucer's
+  velocity.
+
+**Under the hood:**
+- Classic saucer timing uses exact 60 Hz counter-derived intervals and the original 8-bit angular
+  error masks. Replay logic is now version 5; v3/v4 Ancient/Mad recordings remain compatible, while
+  older Classic recordings are rejected instead of drifting.
+
 ## [0.16.5] — 2026-07-19
 
 **For players:**

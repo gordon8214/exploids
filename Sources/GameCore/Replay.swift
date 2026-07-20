@@ -40,7 +40,10 @@ public struct Replay: Codable, Equatable, Sendable {
     /// v4: Classic-Untertassen warten beim Eintritt und nach dem Wiedererscheinen des Schiffs. Das
     ///     verschiebt RNG-Ziehungen und macht v3-Classic-Läufe inkompatibel; Ancient/Mad v3 bleiben
     ///     bitgleich und werden deshalb weiterhin angenommen.
-    public static let currentLogicVersion: Int = 4
+    /// v5: Classic-Untertassen teilen das originale Bewegungsprofil; Feuerintervall, Projektilslots,
+    ///     Ballistik und Zielabweichung folgen dem Arcadecode. Classic-v4-Läufe driften dadurch;
+    ///     Ancient/Mad v3/v4 bleiben bitgleich.
+    public static let currentLogicVersion: Int = 5
 
     public let version: Int
     public let seed: UInt64
@@ -122,12 +125,12 @@ public struct Replay: Codable, Equatable, Sendable {
         try c.encode(height, forKey: .height)
     }
 
-    /// Stimmt die Aufnahme mit der aktuellen Spiel-Logik überein? v3 bleibt für Ancient/Mad
-    /// kompatibel, weil v4 ausschließlich Classic-Timing ändert. Classic v3 würde durch die
-    /// verschobenen Untertassen-RNG-Ziehungen driften und wird klar abgelehnt.
+    /// Stimmt die Aufnahme mit der aktuellen Spiel-Logik überein? v3/v4 bleiben für Ancient/Mad
+    /// kompatibel, weil v4 und v5 ausschließlich Classic-Verhalten ändern. Ältere Classic-Läufe
+    /// würden durch andere Untertassenbewegung und RNG-Werte driften und werden klar abgelehnt.
     public var isCompatible: Bool {
         if version == Replay.currentLogicVersion { return true }
-        guard version == 3 else { return false }
+        guard version == 3 || version == 4 else { return false }
         switch gameMode {
         case .ancientAsteroids, .madMeteoroids:
             return true

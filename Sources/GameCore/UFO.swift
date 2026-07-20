@@ -209,9 +209,9 @@ public final class UFO: SKShapeNode {
         strokeColor = .white
         fillColor = .clear
         lineWidth = 1.8
-        let horizontalSpeed: CGFloat = isSmall ? 165.0 : 115.0
-        velocity = CGPoint(x: startOnLeft ? horizontalSpeed : -horizontalSpeed, y: 0.0)
-        classicNextCourseChange = currentTime + 2.13
+        velocity = CGPoint(x: startOnLeft ? ClassicTuning.saucerSpeed : -ClassicTuning.saucerSpeed,
+                           y: 0.0)
+        classicNextCourseChange = currentTime + ClassicTuning.saucerCourseInterval
         classicNextFireTime = currentTime + ClassicTuning.saucerHoldFireDuration
         VectorGlowRenderer.markStroke(self)
     }
@@ -230,20 +230,39 @@ public final class UFO: SKShapeNode {
         // Deadline landen. Die winzige Toleranz korrigiert nur diesen Rundungsfehler; ein ganzer
         // Simulationsschritt vor der Frist bleibt um Größenordnungen zu früh.
         guard usesClassicBehavior, currentTime + 1e-9 >= classicNextFireTime else { return nil }
-        classicNextFireTime = currentTime + 0.67
+        classicNextFireTime = currentTime + ClassicTuning.saucerFireInterval
 
         let angle: CGFloat
         if isSmall {
-            let base = atan2(target.y - position.y, target.x - position.x)
-            let error: CGFloat = score >= 35_000 ? 0.065 : 0.16
-            angle = base + CGFloat.random(in: -error...error, using: &rng)
+            // Der Arcadecode kompensiert die geerbte Untertassenbewegung über 32 Frames und bildet
+            // den absichtlich groben Zielfehler aus einem maskierten 8-Bit-Zufallswinkel. Unter
+            // 35.000 Punkten sind es -16...+15, danach -7...+8 Schritte eines 256er-Kreises.
+            let compensation = CGFloat(ClassicTuning.saucerAimCompensationDuration)
+            let dx = target.x - position.x - velocity.x * compensation
+            let dy = target.y - position.y - velocity.y * compensation
+            let base = atan2(dy, dx)
+            let randomAngle = UInt8(truncatingIfNeeded: rng.next())
+            let errorMask: UInt8 = score >= 35_000 ? 0x87 : 0x8F
+            let signExtensionMask: UInt8 = score >= 35_000 ? 0x78 : 0x70
+            var errorByte = randomAngle & errorMask
+            if errorByte & 0x80 != 0 { errorByte |= signExtensionMask }
+            // Bei >= 35.000 bleibt der Carry des 6502-Vergleichs bis zum abschließenden ADC gesetzt.
+            // Deshalb verschiebt sich das engere Band von -8...+7 auf tatsächlich -7...+8.
+            let comparisonCarry = score >= 35_000 ? 1 : 0
+            let errorUnits = Int(Int8(bitPattern: errorByte)) + comparisonCarry
+            angle = base + CGFloat(errorUnits) * ClassicTuning.angleStep
         } else {
-            angle = CGFloat.random(in: 0..<(2.0 * .pi), using: &rng)
+            let randomAngle = UInt8(truncatingIfNeeded: rng.next())
+            angle = CGFloat(randomAngle) * ClassicTuning.angleStep
         }
         let spawn = CGPoint(x: position.x + 15.0 * cos(angle),
                             y: position.y + 15.0 * sin(angle))
         let laser = Laser(position: spawn, angle: angle, type: .enemy,
-                          speed: 520.0, lifetime: 1.0)
+                          speed: 0.0, lifetime: ClassicTuning.saucerShotLifetime)
+        laser.velocity = CGPoint(
+            x: ClassicTuning.saucerShotSpeed * cos(angle) + velocity.x,
+            y: ClassicTuning.saucerShotSpeed * sin(angle) + velocity.y
+        )
         laser.applyClassicAppearance()
         return laser
     }

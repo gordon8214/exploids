@@ -218,19 +218,21 @@ final class ReplayDeterminismTests: GameCoreTestCase {
         XCTAssertLessThan(data.count, 8000, "Eine kurze Aufnahme sollte wenige KB groß sein (war \(data.count) B)")
     }
 
-    /// Versions-Tag: v3 bleibt nur für die von v4 unveränderten Ancient-/Mad-Modi kompatibel.
+    /// Versions-Tag: v3/v4 bleiben nur für die von v4/v5 unveränderten Ancient-/Mad-Modi kompatibel.
     func testReplayVersionCompatibility() {
         let ok = Replay(seed: 1, startLevel: 1, gameMode: .ancientAsteroids, events: [], frameCount: 0)
         XCTAssertTrue(ok.isCompatible)
-        let legacyAncient = Replay(version: 3, seed: 1, startLevel: 1,
-                                   gameMode: .ancientAsteroids, events: [], frameCount: 0)
-        let legacyMad = Replay(version: 3, seed: 1, startLevel: 1,
-                               gameMode: .madMeteoroids, events: [], frameCount: 0)
-        let legacyClassic = Replay(version: 3, seed: 1, startLevel: 1,
-                                   gameMode: .classicAsteroids, events: [], frameCount: 0)
-        XCTAssertTrue(legacyAncient.isCompatible)
-        XCTAssertTrue(legacyMad.isCompatible)
-        XCTAssertFalse(legacyClassic.isCompatible)
+        for version in [3, 4] {
+            let legacyAncient = Replay(version: version, seed: 1, startLevel: 1,
+                                       gameMode: .ancientAsteroids, events: [], frameCount: 0)
+            let legacyMad = Replay(version: version, seed: 1, startLevel: 1,
+                                   gameMode: .madMeteoroids, events: [], frameCount: 0)
+            let legacyClassic = Replay(version: version, seed: 1, startLevel: 1,
+                                       gameMode: .classicAsteroids, events: [], frameCount: 0)
+            XCTAssertTrue(legacyAncient.isCompatible)
+            XCTAssertTrue(legacyMad.isCompatible)
+            XCTAssertFalse(legacyClassic.isCompatible)
+        }
 
         for version in [2, Replay.currentLogicVersion + 1] {
             let incompatible = Replay(version: version, seed: 1, startLevel: 1,
@@ -240,21 +242,23 @@ final class ReplayDeterminismTests: GameCoreTestCase {
         }
     }
 
-    func testStartReplayAcceptsVersionThreeStandardButRejectsVersionThreeClassic() {
-        let standardScene = GameScene(size: CGSize(width: 1000, height: 800))
-        let standardView = SKView(frame: CGRect(x: 0, y: 0, width: 1000, height: 800))
-        standardView.presentScene(standardScene)
-        let standard = Replay(version: 3, seed: 1, startLevel: 1,
-                              gameMode: .ancientAsteroids, events: [], frameCount: 1)
-        XCTAssertTrue(standardScene.startReplay(standard))
+    func testStartReplayAcceptsLegacyStandardButRejectsLegacyClassic() {
+        for version in [3, 4] {
+            let standardScene = GameScene(size: CGSize(width: 1000, height: 800))
+            let standardView = SKView(frame: CGRect(x: 0, y: 0, width: 1000, height: 800))
+            standardView.presentScene(standardScene)
+            let standard = Replay(version: version, seed: 1, startLevel: 1,
+                                  gameMode: .ancientAsteroids, events: [], frameCount: 1)
+            XCTAssertTrue(standardScene.startReplay(standard))
 
-        let classicScene = GameScene(size: CGSize(width: 1000, height: 800))
-        let classicView = SKView(frame: CGRect(x: 0, y: 0, width: 1000, height: 800))
-        classicView.presentScene(classicScene)
-        let classic = Replay(version: 3, seed: 1, startLevel: 1,
-                             gameMode: .classicAsteroids, events: [], frameCount: 1)
-        XCTAssertFalse(classicScene.startReplay(classic))
-        XCTAssertFalse(classicScene.isReplaying)
+            let classicScene = GameScene(size: CGSize(width: 1000, height: 800))
+            let classicView = SKView(frame: CGRect(x: 0, y: 0, width: 1000, height: 800))
+            classicView.presentScene(classicScene)
+            let classic = Replay(version: version, seed: 1, startLevel: 1,
+                                 gameMode: .classicAsteroids, events: [], frameCount: 1)
+            XCTAssertFalse(classicScene.startReplay(classic))
+            XCTAssertFalse(classicScene.isReplaying)
+        }
     }
 
     func testReplayDrivenRestartKeepsRecordedSeed() {
