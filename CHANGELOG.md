@@ -2,6 +2,18 @@
 
 All notable changes to Exploids. Dates are ISO 8601 (YYYY-MM-DD).
 
+## [0.16.3] — 2026-07-19
+
+**For players:**
+- Ancient Asteroids and Mad Meteoroids now play the explosion sound for every asteroid hit by a
+  player laser, laser beam or screen bomb. Imploding asteroids give feedback on every shot instead
+  of remaining silent until their final collapse, and the procedural explosion is substantially
+  louder in the gameplay mix.
+
+**Under the hood:**
+- The existing explosion cue now runs through the shared non-Classic asteroid-hit path without
+  changing collision, gameplay RNG or replay behavior.
+
 ## [0.16.2] — 2026-07-19
 
 **For players:**

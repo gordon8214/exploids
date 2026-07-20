@@ -36,6 +36,29 @@ final class AudioSmokeTests: GameCoreTestCase {
         // Kommt bis hierher ohne Absturz/Engine-Start durch → bestanden.
     }
 
+    /// Die prozedurale Explosion wird direkt und ohne Audio-Hardware gerendert. So bleiben Dauer,
+    /// hörbarer Pegel und Abklingkurve des Treffer-Sounds abgesichert.
+    func testGenericExplosionIsAudibleBoundedAndDecays() {
+        let sampleRate = 1_000.0
+        let sound = ActiveSound(type: .explosion, sampleRate: sampleRate)
+        var samples: [Double] = []
+
+        while let sample = sound.nextSample(sampleRate: sampleRate) {
+            samples.append(sample)
+        }
+
+        XCTAssertEqual(samples.count, 500)
+        XCTAssertTrue(samples.allSatisfy(\.isFinite))
+
+        let peak = samples.map(abs).max() ?? 0.0
+        XCTAssertGreaterThan(peak, 0.25)
+        XCTAssertLessThanOrEqual(peak, 1.0)
+
+        let headEnergy = samples.prefix(50).reduce(0.0) { $0 + abs($1) }
+        let tailEnergy = samples.suffix(50).reduce(0.0) { $0 + abs($1) }
+        XCTAssertGreaterThan(headEnergy, tailEnergy * 4.0)
+    }
+
     /// Die Dauer-Zustands-Schalter (Schub-Hum, Kopf-Stimme) dürfen im gemuteten Zustand in
     /// beliebiger Reihenfolge an/aus geschaltet werden, ohne die Engine zu starten.
     func testMutedSoundManagerStateSettersDoNotCrash() {

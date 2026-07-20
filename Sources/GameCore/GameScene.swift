@@ -2301,6 +2301,7 @@ public final class GameScene: SKScene {
     private func processPlayerHitOnAsteroid(_ asteroid: Asteroid, hitPosition: CGPoint,
                                             hitAsteroids: inout Set<Asteroid>,
                                             newAsteroids: inout [Asteroid]) {
+        SoundManager.shared.playExplosion()
         let config = currentConfig()
         if asteroid.isImplodingType {
             asteroid.hitCount += 1
@@ -2323,7 +2324,6 @@ public final class GameScene: SKScene {
                 spawnPowerUp(at: asteroid.position)
             }
 
-            SoundManager.shared.playExplosion()
             createExplosion(at: asteroid.position, sizeClass: asteroid.sizeClass)
             shakeCamera(amplitude: 3.5, numberOfShakes: 4, durationPerShake: 0.02)
         } else {
@@ -2348,7 +2348,6 @@ public final class GameScene: SKScene {
                 spawnPowerUp(at: asteroid.position)
             }
 
-            SoundManager.shared.playExplosion()
             createExplosion(at: asteroid.position, sizeClass: asteroid.sizeClass)
             shakeCamera(amplitude: asteroid.sizeClass == .large ? 3.0 : (asteroid.sizeClass == .medium ? 2.0 : 1.0), numberOfShakes: 4, durationPerShake: 0.02)
         }

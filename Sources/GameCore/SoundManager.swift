@@ -496,8 +496,8 @@ public final class SoundManager: @unchecked Sendable {
         case .ufo:           return "ufo"
         case .levelComplete: return "levelcomplete"
         case .implosion:     return "implosion"
-        case .classicShot, .classicExplosion, .classicHeartbeatLow,
-             .classicHeartbeatHigh, .classicSaucerFire:
+        case .classicShot, .classicExplosion, .classicHeartbeatLow, .classicHeartbeatHigh,
+             .classicSaucerFire:
             return ""
         }
     }
@@ -728,7 +728,9 @@ final class ActiveSound: @unchecked Sendable {
             let filtered = lastSample + alpha * (noise - lastSample)
             lastSample = filtered
             
-            sampleValue = filtered * volume * 0.3
+            // Der frühere Faktor 0,3 ging im Mix aus Theme-Musik und Laserschuss praktisch unter.
+            // Der Filter und die Abklingkurve bleiben unverändert; nur der Ausgangspegel steigt.
+            sampleValue = filtered * volume
             
         case .powerUp:
             let notes = [280.0, 420.0, 560.0, 840.0]

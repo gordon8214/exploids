@@ -58,7 +58,7 @@ targets:
         # Wird von ios/generate.sh automatisch aus der VERSION-Datei im Repo-Root
         # nachgezogen — Projekt immer über `bash ios/generate.sh` generieren,
         # nicht über `xcodegen generate` direkt (sonst driftet die Version).
-        MARKETING_VERSION: "0.16.2"
+        MARKETING_VERSION: "0.16.3"
         CURRENT_PROJECT_VERSION: 1
 
         # App-Icon aus dem Asset-Catalog
