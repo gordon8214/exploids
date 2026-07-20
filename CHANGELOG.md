@@ -2,6 +2,16 @@
 
 All notable changes to Exploids. Dates are ISO 8601 (YYYY-MM-DD).
 
+## [0.16.2] — 2026-07-19
+
+**For players:**
+- Fixed ProMotion rendering remaining at SpriteKit's default 60 FPS. The macOS and iOS apps now
+  request up to 120 FPS on supported displays while retaining automatic fallback on other displays.
+
+**Under the hood:**
+- The render preference remains independent from the deterministic 120 Hz fixed-timestep
+  simulation, so gameplay, RNG and replay compatibility are unchanged.
+
 ## [0.16.1] — 2026-07-19
 
 **For players:**

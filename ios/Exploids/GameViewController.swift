@@ -44,6 +44,9 @@ final class GameViewController: UIViewController {
 
     override func loadView() {
         // SKView direkt als Root-View setzen (kein UIView-Wrapper nötig)
+        // SpriteKit begrenzt SKView standardmäßig auf 60 Bilder/s. 120 ist eine reine
+        // Renderpräferenz und bleibt bewusst unabhängig vom festen Simulationszeitschritt.
+        skView.preferredFramesPerSecond = 120
         skView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         self.view = skView
     }

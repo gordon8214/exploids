@@ -17,6 +17,9 @@ public final class GameWindow: NSWindow, @preconcurrency SKViewDelegate {
         let styleMask: NSWindow.StyleMask = [.titled, .closable, .miniaturizable, .resizable]
 
         let gameView = SKView(frame: contentRect)
+        // SpriteKit begrenzt SKView standardmäßig auf 60 Bilder/s. 120 ist eine reine
+        // Renderpräferenz und bleibt bewusst unabhängig vom festen Simulationszeitschritt.
+        gameView.preferredFramesPerSecond = 120
         let gameScene = GameScene(size: contentRect.size)
         self.gameView = gameView
         self.gameScene = gameScene

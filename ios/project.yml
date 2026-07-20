@@ -33,6 +33,24 @@ targets:
     # (ohne Scheme resolvt der reine `-target`-Build das lokale SwiftPM-Package nicht sauber).
     scheme: {}
 
+    # Xcode übernimmt nicht jeden beliebigen INFOPLIST_KEY_* in seine automatisch erzeugte Plist.
+    # XcodeGen schreibt deshalb diese deklarative Quelle als echte Info.plist aus.
+    info:
+      path: Exploids/Info.plist
+      properties:
+        CFBundleDisplayName: Exploids
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        # Auf ProMotion-iPhones Bildraten oberhalb des 60-Hz-Systemdefaults freigeben.
+        CADisableMinimumFrameDurationOnPhone: true
+        # Leerer schwarzer Launch-Screen ohne separates Storyboard.
+        UILaunchScreen: {}
+        UIStatusBarHidden: true
+        UIRequiresFullScreen: true
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+
     # Build-Einstellungen
     settings:
       base:
@@ -40,20 +58,8 @@ targets:
         # Wird von ios/generate.sh automatisch aus der VERSION-Datei im Repo-Root
         # nachgezogen — Projekt immer über `bash ios/generate.sh` generieren,
         # nicht über `xcodegen generate` direkt (sonst driftet die Version).
-        MARKETING_VERSION: "0.16.1"
+        MARKETING_VERSION: "0.16.2"
         CURRENT_PROJECT_VERSION: 1
-
-        # Info.plist wird von Xcode/XcodeGen automatisch generiert (kein manuelles Info.plist nötig)
-        GENERATE_INFOPLIST_FILE: YES
-        INFOPLIST_KEY_CFBundleDisplayName: Exploids
-
-        # Launch-Screen automatisch generieren (leerer schwarzer Screen)
-        INFOPLIST_KEY_UILaunchScreen_Generation: YES
-
-        # UI-Konfiguration: Vollbild-Landscape ohne Status-/Home-Bar
-        INFOPLIST_KEY_UIStatusBarHidden: YES
-        INFOPLIST_KEY_UIRequiresFullScreen: YES
-        INFOPLIST_KEY_UISupportedInterfaceOrientations: "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
 
         # App-Icon aus dem Asset-Catalog
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
