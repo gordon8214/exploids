@@ -236,12 +236,23 @@ final class ClassicModeTests: GameCoreTestCase {
         scene.ship.velocity = CGPoint(x: 37, y: -12)
         scene.autoFire = true
 
+        let expected = ClassicProjectileCalibrator.calibrate(
+            angle: scene.ship.zRotation,
+            shooterVelocity: scene.ship.velocity,
+            arenaSize: arenaSize,
+            movementFrames: ClassicProjectileCalibrator.playerMovementFrames(forLaunchPhase: 0)
+        )
+
         scene.simulateKeyDown(keyCode: 49)
         scene.simulateKeyDown(keyCode: 49)
         XCTAssertEqual(scene.activeLasers.count, 1, "Key-Repeat darf keinen weiteren Schuss auslösen")
-        XCTAssertEqual(scene.activeLasers[0].velocity.x, 517, accuracy: 0.001)
-        XCTAssertEqual(scene.activeLasers[0].velocity.y, -12, accuracy: 0.001)
-        XCTAssertEqual(scene.activeLasers[0].lifetime, 0.8, accuracy: 0.0001)
+        XCTAssertEqual(scene.activeLasers[0].velocity.x, expected.velocity.x, accuracy: 0.000_001)
+        XCTAssertEqual(scene.activeLasers[0].velocity.y, expected.velocity.y, accuracy: 0.000_001)
+        XCTAssertEqual(scene.activeLasers[0].lifetime, expected.lifetime, accuracy: 0.000_001)
+        XCTAssertEqual(scene.activeLasers[0].position.x,
+                       scene.ship.position.x + expected.spawnOffset.x, accuracy: 0.000_001)
+        XCTAssertEqual(scene.activeLasers[0].position.y,
+                       scene.ship.position.y + expected.spawnOffset.y, accuracy: 0.000_001)
 
         for _ in 0..<4 {
             scene.simulateKeyUp(keyCode: 49)
@@ -373,23 +384,28 @@ final class ClassicModeTests: GameCoreTestCase {
                 saucer.applyClassicBehavior(startOnLeft: true, currentTime: startTime)
 
                 XCTAssertNil(saucer.shootClassic(target: .zero, score: 35_000,
-                                                  currentTime: startTime, using: &rng))
+                                                  currentTime: startTime, arenaSize: testCase.size,
+                                                  using: &rng))
                 XCTAssertNil(saucer.shootClassic(
                     target: .zero,
                     score: 35_000,
                     currentTime: startTime + ClassicTuning.saucerHoldFireDuration - GameScene.simStep,
+                    arenaSize: testCase.size,
                     using: &rng
                 ))
 
                 let firstFireTime = startTime + ClassicTuning.saucerHoldFireDuration
                 XCTAssertNotNil(saucer.shootClassic(target: .zero, score: 35_000,
-                                                     currentTime: firstFireTime, using: &rng))
+                                                     currentTime: firstFireTime,
+                                                     arenaSize: testCase.size, using: &rng))
                 XCTAssertNil(saucer.shootClassic(target: .zero, score: 35_000,
                                                   currentTime: firstFireTime + fireInterval
                                                       - GameScene.simStep,
+                                                  arenaSize: testCase.size,
                                                   using: &rng))
                 XCTAssertNotNil(saucer.shootClassic(target: .zero, score: 35_000,
                                                      currentTime: firstFireTime + fireInterval,
+                                                     arenaSize: testCase.size,
                                                      using: &rng))
             }
         }
@@ -412,13 +428,25 @@ final class ClassicModeTests: GameCoreTestCase {
                 target: target,
                 score: 0,
                 currentTime: ClassicTuning.saucerHoldFireDuration,
+                arenaSize: arenaSize,
                 using: &shotRNG
             ))
-            let launchVelocity = CGPoint(x: shot.velocity.x - saucer.velocity.x,
-                                         y: shot.velocity.y - saucer.velocity.y)
+            let expected = ClassicProjectileCalibrator.calibrate(
+                angle: shot.zRotation,
+                shooterVelocity: saucer.velocity,
+                arenaSize: arenaSize,
+                movementFrames: ClassicProjectileCalibrator.saucerMovementFrames
+            )
 
-            XCTAssertEqual(hypot(launchVelocity.x, launchVelocity.y), 480.0, accuracy: 0.000_001)
-            XCTAssertEqual(shot.lifetime, 1.2, accuracy: 0.000_001)
+            // SpriteKit rundet `zRotation` intern minimal; der erneut daraus berechnete Erwartungswert
+            // darf deshalb wenige Millionstel vom unmittelbar erzeugten Vektor abweichen.
+            XCTAssertEqual(shot.velocity.x, expected.velocity.x, accuracy: 0.000_01)
+            XCTAssertEqual(shot.velocity.y, expected.velocity.y, accuracy: 0.000_01)
+            XCTAssertEqual(shot.lifetime, expected.lifetime, accuracy: 0.000_001)
+            XCTAssertEqual(shot.position.x, saucer.position.x + expected.spawnOffset.x,
+                           accuracy: 0.000_001)
+            XCTAssertEqual(shot.position.y, saucer.position.y + expected.spawnOffset.y,
+                           accuracy: 0.000_001)
         }
 
         for (score, allowedRange) in [(0, -16...15), (35_000, -7...8)] {
@@ -434,6 +462,7 @@ final class ClassicModeTests: GameCoreTestCase {
                 target: target,
                 score: score,
                 currentTime: ClassicTuning.saucerHoldFireDuration,
+                arenaSize: arenaSize,
                 using: &shotRNG
             ))
             let ideal = atan2(target.y, target.x)
@@ -608,7 +637,7 @@ final class ClassicModeTests: GameCoreTestCase {
         scene.advanceOneStep()
 
         let replay = scene.currentReplayForTesting()
-        XCTAssertEqual(Replay.currentLogicVersion, 6)
+        XCTAssertEqual(Replay.currentLogicVersion, 7)
         XCTAssertEqual(replay?.gameMode.rawValue, 2)
         XCTAssertEqual(replay?.startLevel, 1)
         XCTAssertEqual(replay?.autoFire, false)
@@ -640,9 +669,11 @@ final class ClassicModeTests: GameCoreTestCase {
         let ideal = atan2(target.y, target.x)
         let firstFireTime = ClassicTuning.saucerHoldFireDuration
         let lowShot = lowAim.shootClassic(target: target, score: 0,
-                                          currentTime: firstFireTime, using: &lowRNG)
+                                          currentTime: firstFireTime, arenaSize: arenaSize,
+                                          using: &lowRNG)
         let highShot = highAim.shootClassic(target: target, score: 35_000,
-                                            currentTime: firstFireTime, using: &highRNG)
+                                            currentTime: firstFireTime, arenaSize: arenaSize,
+                                            using: &highRNG)
         XCTAssertLessThanOrEqual(abs(normalizedAngle((highShot?.zRotation ?? 0) - ideal)),
                                  abs(normalizedAngle((lowShot?.zRotation ?? 0) - ideal)) + 0.0001)
 
@@ -816,6 +847,7 @@ final class ClassicModeTests: GameCoreTestCase {
         let enemyShot = saucer.shootClassic(target: scene.ship.position, score: 0,
                                             currentTime: scene.classicSession.elapsedTime
                                                 + ClassicTuning.saucerHoldFireDuration,
+                                            arenaSize: scene.size,
                                             using: &shotRNG)
         XCTAssertTrue(enemyShot.map { isOpaqueWhite($0.strokeColor) } == true)
         XCTAssertTrue(enemyShot.map(VectorGlowRenderer.isStrokeMarked) == true)

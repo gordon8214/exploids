@@ -32,6 +32,15 @@ public final class Laser: SKShapeNode {
     /// The elapsed time since the laser was fired.
     private var elapsedTime: TimeInterval = 0.0
 
+    /// Nur kalibrierte Classic-Schüsse besitzen nach ihrer Flugzeit noch einen sichtbaren,
+    /// nicht mehr kollidierenden Endpunkt. Ein reines Classic-Aussehen aktiviert dies nicht.
+    private var usesClassicBallistics = false
+    private var classicSpentDisplayTime: TimeInterval = 0.0
+
+    /// Ein verbrauchter Classic-Schuss bleibt noch einen Arcade-Bildschritt sichtbar, ist aber ab
+    /// diesem Moment weder kollidierbar noch ein belegter Spieler-/Untertassen-Projektilslot.
+    private(set) var isClassicSpent = false
+
     /// Kennzeichnet das interne Classic-Profil, ohne die öffentlichen Initializer zu verändern.
     private(set) var usesClassicAppearance = false
     
@@ -129,11 +138,25 @@ public final class Laser: SKShapeNode {
         lineWidth = 2.0
         VectorGlowRenderer.markStroke(self)
     }
+
+    /// Aktiviert die quellgetreue Classic-Lebensdauer für einen bereits mit der berechneten
+    /// `lifetime` erzeugten Schuss. Test-Laser mit weißem Aussehen bleiben ohne diesen Aufruf normal.
+    func applyClassicBallistics(velocity: CGPoint) {
+        self.velocity = velocity
+        elapsedTime = 0.0
+        classicSpentDisplayTime = 0.0
+        isClassicSpent = false
+        usesClassicBallistics = true
+    }
     
     // MARK: - Update
     
     /// Updates the laser's position and lifetime.
     public func update(deltaTime: TimeInterval) -> Bool {
+        if usesClassicBallistics {
+            return updateClassicBallistics(deltaTime: deltaTime)
+        }
+
         let dt = CGFloat(deltaTime)
         
         position.x += velocity.x * dt
@@ -141,6 +164,33 @@ public final class Laser: SKShapeNode {
         
         elapsedTime += deltaTime
         return elapsedTime >= lifetime
+    }
+
+    private func updateClassicBallistics(deltaTime: TimeInterval) -> Bool {
+        var remainingStep = max(0.0, deltaTime)
+
+        if !isClassicSpent {
+            let remainingFlight = max(0.0, lifetime - elapsedTime)
+            let reachesEndpoint = remainingStep >= remainingFlight
+            let flightStep = reachesEndpoint ? remainingFlight : remainingStep
+            let dt = CGFloat(flightStep)
+            position.x += velocity.x * dt
+            position.y += velocity.y * dt
+            remainingStep -= flightStep
+
+            if reachesEndpoint {
+                elapsedTime = lifetime
+                isClassicSpent = true
+            } else {
+                elapsedTime += flightStep
+            }
+        }
+
+        if isClassicSpent {
+            classicSpentDisplayTime += remainingStep
+            return classicSpentDisplayTime >= ClassicProjectileCalibrator.displayFrameDuration
+        }
+        return false
     }
     
     /// Returns the world-space start and end points of the laser segment.

@@ -225,7 +225,7 @@ public final class UFO: SKShapeNode {
 
     /// Classic-Saucer-Schuss: große Untertasse zufällig, kleine mit ab 35.000 Punkten engerem Fehler.
     func shootClassic(target: CGPoint, score: Int, currentTime: TimeInterval,
-                      using rng: inout GameRandom) -> Laser? {
+                      arenaSize: CGSize, using rng: inout GameRandom) -> Laser? {
         // Wiederholtes Addieren des 1/120-s-Schritts kann wenige ULP unter der mathematischen
         // Deadline landen. Die winzige Toleranz korrigiert nur diesen Rundungsfehler; ein ganzer
         // Simulationsschritt vor der Frist bleibt um Größenordnungen zu früh.
@@ -255,14 +255,17 @@ public final class UFO: SKShapeNode {
             let randomAngle = UInt8(truncatingIfNeeded: rng.next())
             angle = CGFloat(randomAngle) * ClassicTuning.angleStep
         }
-        let spawn = CGPoint(x: position.x + 15.0 * cos(angle),
-                            y: position.y + 15.0 * sin(angle))
-        let laser = Laser(position: spawn, angle: angle, type: .enemy,
-                          speed: 0.0, lifetime: ClassicTuning.saucerShotLifetime)
-        laser.velocity = CGPoint(
-            x: ClassicTuning.saucerShotSpeed * cos(angle) + velocity.x,
-            y: ClassicTuning.saucerShotSpeed * sin(angle) + velocity.y
+        let calibration = ClassicProjectileCalibrator.calibrate(
+            angle: angle,
+            shooterVelocity: velocity,
+            arenaSize: arenaSize,
+            movementFrames: ClassicProjectileCalibrator.saucerMovementFrames
         )
+        let spawn = CGPoint(x: position.x + calibration.spawnOffset.x,
+                            y: position.y + calibration.spawnOffset.y)
+        let laser = Laser(position: spawn, angle: angle, type: .enemy,
+                          speed: 0.0, lifetime: calibration.lifetime)
+        laser.applyClassicBallistics(velocity: calibration.velocity)
         laser.applyClassicAppearance()
         return laser
     }

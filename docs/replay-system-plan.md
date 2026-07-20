@@ -1,6 +1,6 @@
 # Plan: Deterministisches Replay-System
 
-Stand: 2026-06-25. **Status: Phase 1 + 2 + 3 vollständig abgeschlossen** (inkl. 3.1 Fixed-Timestep,
+Stand: 2026-07-20. **Status: Phase 1 + 2 + 3 vollständig abgeschlossen** (inkl. 3.1 Fixed-Timestep,
 umgesetzt in v0.12.0; Spielgefühl über Playtest abzunehmen). Dieses Dokument ist die
 Arbeitsgrundlage; jeder Unterschritt hat ein prüfbares Erfolgskriterium.
 
@@ -34,6 +34,15 @@ dem Wiedererscheinen des Spielerschiffs 1,2 Sekunden bis zum nächsten Schuss. W
 Zeitpunkt und Reihenfolge gameplay-relevanter RNG-Ziehungen ändern, werden v3-Classic-Aufnahmen
 abgelehnt. Ancient/Mad änderten sich nicht und dürfen ihre v3-Aufnahmen weiterhin bitgenau abspielen;
 das gespeicherte Fixed-Timestep-Datenformat selbst bleibt unverändert.
+
+**Umsetzungsnotiz Logik-Versionen 5–7 (v0.16.6–v0.16.8):** v5 stellte Classic-Untertassen-
+Bewegung, Feuerintervalle, Projektilslots und Zielabweichung auf die Quellregeln um; v6 ersetzte
+zufällige Eintrittsfristen durch EDELAY-/SEDLAY-/RTIMER-Zähler. v7 kalibriert Spieler- und
+Untertassenschüsse mit Ataris echtem 62,5-Hz-Takt, phasenabhängigen 69–72 Bewegungsbildern,
+Fixed-Point-Geschwindigkeit, Vererbung, Clamp, Mündungsversatz und nicht mehr schädlichem
+Endbild. Das Replay-Schema blieb unverändert. Jede dieser Änderungen lässt ältere Classic-Läufe
+driften; deshalb akzeptiert v7 für Classic nur v7, während Ancient/Mad von v3 bis v6 kompatibel
+bleiben.
 
 **Umsetzungsnotiz Phase 1 (erledigt):** PRNG `GameRandom` (SplitMix64) eingeführt; alle
 gameplay-relevanten `.random`-Aufrufe ziehen aus einem pro Lauf geseedeten `rng` (Entities über
@@ -83,7 +92,7 @@ sondern darin, die Simulation vollständig **deterministisch** zu machen.
   Phase 3 (Fixed-Timestep) entfällt die `dt`-Folge.
 - **Versionsbindung:** Jede Aufnahme trägt das Logik-Versions-Tag. Beim Abspielen wird ein Mismatch
   grundsätzlich abgelehnt; eine ältere Version bleibt nur nach expliziter, modusspezifischer
-  Kompatibilitätsentscheidung zugelassen (aktuell v3/v4/v5 für unveränderte Ancient-/Mad-Läufe).
+  Kompatibilitätsentscheidung zugelassen (aktuell v3–v6 für unveränderte Ancient-/Mad-Läufe).
 - **Audio bleibt außen vor:** Sound wird beim Replay aus Spielereignissen neu getriggert, nicht
   aufgezeichnet. Audio-Zufall (SoundManager) muss daher nicht geseedet werden.
 

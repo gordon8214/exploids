@@ -46,7 +46,10 @@ public struct Replay: Codable, Equatable, Sendable {
     /// v6: Classic-Untertassen erscheinen nach Ataris zustandsbehafteten EDELAY-/SEDLAY-/RTIMER-
     ///     Zählern. Zufällige, punktabhängige Fristen entfallen; Classic-v5-Läufe driften,
     ///     Ancient/Mad v3/v4/v5 bleiben bitgleich.
-    public static let currentLogicVersion: Int = 6
+    /// v7: Classic-Spieler- und Untertassenschüsse verwenden Ataris 62,5-Hz-Lebensdauer,
+    ///     Fixed-Point-Geschwindigkeit, Phasenlage, Spawn-Offset und Endpunktzustand. Classic-v6-
+    ///     Läufe driften; Ancient/Mad v3 bis v6 bleiben bitgleich.
+    public static let currentLogicVersion: Int = 7
 
     public let version: Int
     public let seed: UInt64
@@ -128,12 +131,13 @@ public struct Replay: Codable, Equatable, Sendable {
         try c.encode(height, forKey: .height)
     }
 
-    /// Stimmt die Aufnahme mit der aktuellen Spiel-Logik überein? v3/v4/v5 bleiben für Ancient/Mad
-    /// kompatibel, weil v4 bis v6 ausschließlich Classic-Verhalten ändern. Ältere Classic-Läufe
-    /// würden durch andere Untertassenlogik und RNG-Werte driften und werden klar abgelehnt.
+    /// Stimmt die Aufnahme mit der aktuellen Spiel-Logik überein? v3 bis v6 bleiben für Ancient/Mad
+    /// kompatibel, weil v4 bis v7 ausschließlich Classic-Verhalten ändern. Ältere Classic-Läufe
+    /// würden durch andere Projektil-/Untertassenlogik und RNG-Zeitpunkte driften und werden klar
+    /// abgelehnt.
     public var isCompatible: Bool {
         if version == Replay.currentLogicVersion { return true }
-        guard (3...5).contains(version) else { return false }
+        guard (3...6).contains(version) else { return false }
         switch gameMode {
         case .ancientAsteroids, .madMeteoroids:
             return true

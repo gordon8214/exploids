@@ -6,7 +6,8 @@ enum ClassicTuning {
     static let waveDelay: TimeInterval = 127.0 / 60.0
     static let respawnDelay: TimeInterval = 129.0 / 60.0
     static let hyperspaceDelay: TimeInterval = 48.0 / 60.0
-    static let playerShotLifetime: TimeInterval = 0.8
+    /// Bleibt nur als glatter Exploids-Richtungsvektor erhalten; der Betrag des fertigen Schusses
+    /// kommt aus dem diskreten Atari-Vektorprofil.
     static let playerShotSpeed: CGFloat = 480.0
     static let safeRespawnRadius: CGFloat = 105.0
     /// Das Original nutzt für beide Untertassengrößen XINC = +/-$10. Mit drei
@@ -19,10 +20,6 @@ enum ClassicTuning {
     static let saucerHoldFireDuration: TimeInterval = 18.0 * 4.0 / 60.0
     /// Nachfolgende Schüsse nutzen denselben Vier-Frame-Takt mit einem Zählerstand von zehn.
     static let saucerFireInterval: TimeInterval = 10.0 * 4.0 / 60.0
-    /// Saucer- und Spielerschüsse teilen im Arcadecode denselben Grundvektor; die Eigenbewegung
-    /// des Schützen wird anschließend addiert.
-    static let saucerShotSpeed = playerShotSpeed
-    static let saucerShotLifetime: TimeInterval = 18.0 * 4.0 / 60.0
     /// Die Objektslots 2 und 3 sind für Untertassenschüsse reserviert; 4...7 gehören dem Spieler.
     static let maximumSaucerShots = 2
     /// Beim Zielen zieht der Arcadecode 32 Bewegungsframes vom Abstand ab, bevor er den Winkel bildet.
@@ -42,6 +39,9 @@ enum ClassicTuning {
     /// Jeder Felstreffer setzt RTIMER auf $50; solange er läuft, darf die Untertasse erst bei
     /// hinreichend wenigen verbliebenen Felsen erscheinen.
     static let saucerAsteroidHitTicks = 0x50
+    /// 62,5 Arcade-Bilder pro Sekunde als exakter rationaler Anteil der 120-Hz-Simulation.
+    static let arcadeClockNumerator = 125
+    static let arcadeClockDenominator = 240
 
     static func largeAsteroidCount(for wave: Int) -> Int {
         switch wave {
@@ -79,6 +79,10 @@ struct ClassicSession {
     var saucerAsteroidHitTimerTicks = 0
     var saucerTimerStepPhase = 0
     var saucerAppearances = 0
+    /// Nummer des nächsten Atari-Bildes, auf dem ein zwischen Simulationsschritten empfangener
+    /// Spielerschuss verarbeitet würde. Der rationale Rest verhindert jegliche Wandzeit-Abhängigkeit.
+    var nextArcadeFrame: UInt8 = 0
+    var arcadeClockAccumulator = 0
     var nextHeartbeatTime: TimeInterval = 0.0
     var heartbeatHigh = false
     var waveHits = 0
@@ -91,6 +95,18 @@ struct ClassicSession {
     var isShipActive: Bool {
         if case .active = shipPhase { return true }
         return false
+    }
+
+    var nextArcadeFramePhase: Int {
+        Int(nextArcadeFrame & 3)
+    }
+
+    mutating func advanceArcadeClock() {
+        arcadeClockAccumulator += ClassicTuning.arcadeClockNumerator
+        while arcadeClockAccumulator >= ClassicTuning.arcadeClockDenominator {
+            arcadeClockAccumulator -= ClassicTuning.arcadeClockDenominator
+            nextArcadeFrame &+= 1
+        }
     }
 }
 
@@ -124,6 +140,7 @@ extension GameScene {
     /// Ancient/Mad-Rumpf aufgerufen und hält Wellenregeln, Physik und Kollisionen lokal.
     func updateClassicMode(deltaTime: TimeInterval) {
         classicSession.elapsedTime += deltaTime
+        classicSession.advanceArcadeClock()
         let currentTime = classicSession.elapsedTime
         playTime += deltaTime
         updateClassicShipPhase(currentTime: currentTime)
@@ -170,18 +187,25 @@ extension GameScene {
         guard gameMode == .classicAsteroids, gameState == .playing,
               classicSession.isShipActive, !ship.isHidden else { return }
         let playerShots = activeLasers.reduce(into: 0) { count, laser in
-            if laser.type == .normal { count += 1 }
+            if laser.type == .normal, !laser.isClassicSpent { count += 1 }
         }
         guard playerShots < 4 else { return }
 
         let angle = ship.zRotation
-        let spawn = CGPoint(x: ship.position.x + 18.0 * cos(angle),
-                            y: ship.position.y + 18.0 * sin(angle))
+        let movementFrames = ClassicProjectileCalibrator.playerMovementFrames(
+            forLaunchPhase: classicSession.nextArcadeFramePhase
+        )
+        let calibration = ClassicProjectileCalibrator.calibrate(
+            angle: angle,
+            shooterVelocity: ship.velocity,
+            arenaSize: size,
+            movementFrames: movementFrames
+        )
+        let spawn = CGPoint(x: ship.position.x + calibration.spawnOffset.x,
+                            y: ship.position.y + calibration.spawnOffset.y)
         let laser = Laser(position: spawn, angle: angle, type: .normal,
-                          speed: ClassicTuning.playerShotSpeed,
-                          lifetime: ClassicTuning.playerShotLifetime)
-        laser.velocity.x += ship.velocity.x
-        laser.velocity.y += ship.velocity.y
+                          speed: 0.0, lifetime: calibration.lifetime)
+        laser.applyClassicBallistics(velocity: calibration.velocity)
         laser.applyClassicAppearance()
         addChild(laser)
         activeLasers.append(laser)
@@ -295,7 +319,7 @@ extension GameScene {
                 < ClassicTuning.safeRespawnRadius + asteroid.sizeClass.rawValue { return false }
         }
         for ufo in activeUFOs where classicDistance(.zero, ufo.position) < 135.0 { return false }
-        for laser in activeLasers where laser.type != .normal {
+        for laser in activeLasers where laser.type != .normal && !laser.isClassicSpent {
             if classicDistance(.zero, laser.position) < 90.0 { return false }
         }
         return true
@@ -503,13 +527,13 @@ extension GameScene {
             if ufo.position.y < -halfHeight { ufo.position.y += size.height }
 
             let enemyShotCount = activeLasers.reduce(into: 0) { count, laser in
-                if laser.type != .normal { count += 1 }
+                if laser.type != .normal, !laser.isClassicSpent { count += 1 }
             }
             if classicSession.isShipActive, !ship.isHidden {
                 // Atari setzt den Feuerzähler und verbraucht den Ziel-Zufall auch dann, wenn beide
                 // Untertassen-Projektilslots belegt sind. Der fertige Schuss wird dann verworfen.
                 let shot = ufo.shootClassic(target: ship.position, score: score,
-                                            currentTime: currentTime, using: &rng)
+                                            currentTime: currentTime, arenaSize: size, using: &rng)
                 if enemyShotCount < ClassicTuning.maximumSaucerShots, let shot {
                     addChild(shot)
                     activeLasers.append(shot)
@@ -551,6 +575,10 @@ extension GameScene {
         survivingLasers.reserveCapacity(activeLasers.count)
 
         for laser in activeLasers {
+            if laser.isClassicSpent {
+                survivingLasers.append(laser)
+                continue
+            }
             if let asteroid = activeAsteroids.first(where: {
                 CollisionHelper.laserIntersectsAsteroid(laser, $0)
             }) {

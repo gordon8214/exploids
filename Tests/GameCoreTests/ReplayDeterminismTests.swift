@@ -127,7 +127,11 @@ final class ReplayDeterminismTests: GameCoreTestCase {
         out += "\nwell[\(s.activeGravityWells.count)]: "
         for w in s.activeGravityWells { out += "\(p(w.position)) " }
         out += "\nlas[\(s.activeLasers.count)]: "
-        for l in s.activeLasers { out += "\(p(l.position)) " }
+        for l in s.activeLasers {
+            out += "\(p(l.position))v\(p(l.velocity))life\(l.lifetime.bitPattern)spent\(l.isClassicSpent) "
+        }
+        out += "\nclassicFrame=\(s.classicSession.nextArcadeFrame)"
+        out += " classicRemainder=\(s.classicSession.arcadeClockAccumulator)"
         return out
     }
 
@@ -218,11 +222,11 @@ final class ReplayDeterminismTests: GameCoreTestCase {
         XCTAssertLessThan(data.count, 8000, "Eine kurze Aufnahme sollte wenige KB groß sein (war \(data.count) B)")
     }
 
-    /// v3/v4/v5 bleiben nur für die von den Classic-Änderungen unveränderten Standardmodi kompatibel.
+    /// v3 bis v6 bleiben nur für die von den Classic-Änderungen unveränderten Standardmodi kompatibel.
     func testReplayVersionCompatibility() {
         let ok = Replay(seed: 1, startLevel: 1, gameMode: .ancientAsteroids, events: [], frameCount: 0)
         XCTAssertTrue(ok.isCompatible)
-        for version in [3, 4, 5] {
+        for version in 3...6 {
             let legacyAncient = Replay(version: version, seed: 1, startLevel: 1,
                                        gameMode: .ancientAsteroids, events: [], frameCount: 0)
             let legacyMad = Replay(version: version, seed: 1, startLevel: 1,
@@ -240,10 +244,16 @@ final class ReplayDeterminismTests: GameCoreTestCase {
             XCTAssertFalse(incompatible.isCompatible,
                            "Nicht freigegebene Logik-Versionen müssen inkompatibel bleiben")
         }
+        for version in 1..<Replay.currentLogicVersion {
+            let legacyClassic = Replay(version: version, seed: 1, startLevel: 1,
+                                       gameMode: .classicAsteroids, events: [], frameCount: 0)
+            XCTAssertFalse(legacyClassic.isCompatible,
+                           "Classic darf keine Aufnahme vor Logik-Version 7 akzeptieren")
+        }
     }
 
     func testStartReplayAcceptsLegacyStandardButRejectsLegacyClassic() {
-        for version in [3, 4, 5] {
+        for version in 3...6 {
             let standardScene = GameScene(size: CGSize(width: 1000, height: 800))
             let standardView = SKView(frame: CGRect(x: 0, y: 0, width: 1000, height: 800))
             standardView.presentScene(standardScene)
@@ -331,6 +341,55 @@ final class ReplayDeterminismTests: GameCoreTestCase {
 
         XCTAssertEqual(stateSnapshot(b), snapA, "Wiedergabe muss die Aufnahme bit-genau reproduzieren")
         XCTAssertTrue(b.isReplaying, "Nach genau allen Frames läuft die Wiedergabe noch (Abschluss erst im Folgeframe)")
+    }
+
+    /// v7-Probe für den neuen 62,5-Hz-Phasenzähler und phasenabhängige Classic-Schüsse: Aufnahme
+    /// und Wiedergabe müssen einschließlich Projektilzustand und rationalem Takt bitgleich enden.
+    func testClassicV7RecordThenReplayReproducesBallisticsAndPhaseClock() {
+        let frames = 240
+        let seed: UInt64 = 0xA7A21_0007
+        let arena = CGSize(width: 1024, height: 768)
+
+        @MainActor func driveClassic(_ scene: GameScene) {
+            var fireDown = false
+            for frame in 0..<frames {
+                if frame == 8 { scene.simulateKeyDown(keyCode: 13) }
+                if frame == 68 { scene.simulateKeyUp(keyCode: 13) }
+                if frame == 24 { scene.simulateKeyDown(keyCode: 0) }
+                if frame == 104 { scene.simulateKeyUp(keyCode: 0) }
+                if frame.isMultiple(of: 17) {
+                    scene.simulateKeyDown(keyCode: 49)
+                    fireDown = true
+                } else if fireDown {
+                    scene.simulateKeyUp(keyCode: 49)
+                    fireDown = false
+                }
+                scene.advanceOneStep()
+            }
+        }
+
+        let recordedScene = GameScene(size: arena)
+        let recordedView = SKView(frame: CGRect(origin: .zero, size: arena))
+        recordedView.presentScene(recordedScene)
+        recordedScene.externalStepDriving = true
+        recordedScene.startNewGameForTesting(seed: seed, startLevel: 1, mode: .classicAsteroids)
+        driveClassic(recordedScene)
+        XCTAssertEqual(recordedScene.gameState, .playing)
+        let recordedSnapshot = stateSnapshot(recordedScene)
+        guard let replay = recordedScene.currentReplayForTesting() else {
+            return XCTFail("Classic-Aufnahme fehlt")
+        }
+        XCTAssertEqual(replay.version, 7)
+        XCTAssertEqual(replay.frameCount, frames)
+
+        let replayScene = GameScene(size: arena)
+        let replayView = SKView(frame: CGRect(origin: .zero, size: arena))
+        replayView.presentScene(replayScene)
+        replayScene.externalStepDriving = true
+        XCTAssertTrue(replayScene.startReplay(replay))
+        for _ in 0..<replay.frameCount { replayScene.advanceOneStep() }
+
+        XCTAssertEqual(stateSnapshot(replayScene), recordedSnapshot)
     }
 
     /// Regression: Ein mit AUTO-FEUER gespielter Lauf muss sich exakt reproduzieren. Auto-Feuer

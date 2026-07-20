@@ -2,6 +2,23 @@
 
 All notable changes to Exploids. Dates are ISO 8601 (YYYY-MM-DD).
 
+## [0.16.8] — 2026-07-20
+
+**For players:**
+- Classic player and saucer shots now reproduce Atari's original range and timing envelope. Each
+  shot uses the source's angle-derived fixed-point speed, inherited shooter motion, per-axis speed
+  cap, muzzle offset and 69–72-frame lifetime while retaining Exploids' smooth aiming direction.
+- Projectile distance scales with the arena dimensions, so default, resized and full-screen games
+  preserve the same fractional screen reach. A shot's final source-authentic position remains
+  visible for one arcade frame but can no longer damage anything or occupy a projectile slot.
+
+**Under the hood:**
+- Classic ballistics derive the 256-angle integer trigonometry algorithmically and run their phase
+  timing from a deterministic rational 62.5 Hz clock inside the 120 Hz simulation. No Atari lookup
+  table or source data is included.
+- Replay logic is now version 7. The replay schema is unchanged; v3–v6 Ancient/Mad recordings
+  remain compatible, while every pre-v7 Classic recording is rejected instead of drifting.
+
 ## [0.16.7] — 2026-07-20
 
 **For players:**
