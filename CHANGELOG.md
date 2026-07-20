@@ -2,6 +2,22 @@
 
 All notable changes to Exploids. Dates are ISO 8601 (YYYY-MM-DD).
 
+## [0.16.7] — 2026-07-20
+
+**For players:**
+- Classic saucer arrivals now follow Atari's original stateful counters instead of random,
+  score-based deadlines. A new wave starts with the arcade `$7F` delay; after each saucer, the
+  reload drops by `$06` from `$92` to the `$20` floor, making appearances progressively more
+  frequent over a run.
+- The arrival counter pauses while the ship is unavailable or a saucer is already active. Recent
+  asteroid hits also apply Atari's `$50` low-rock gate and 18-tick retry, and a cleared wave waits
+  for an active saucer to leave before the next set of rocks appears.
+
+**Under the hood:**
+- The 8-bit saucer counters run on the arcade routine's 15 Hz cadence and reset when a saucer is
+  destroyed or exits the screen. Replay logic is now version 6; v3/v4/v5 Ancient/Mad recordings
+  remain compatible, while older Classic recordings are rejected instead of drifting.
+
 ## [0.16.6] — 2026-07-19
 
 **For players:**

@@ -64,7 +64,7 @@ final class ClassicModeTests: GameCoreTestCase {
                        "Classic-Wellen dürfen die Standard-Level-Freischaltung nicht verändern")
     }
 
-    func testClassicWaveDelayDoesNotWaitForActiveSaucer() {
+    func testClassicWaveWaitsForActiveSaucerThenResetsEntryCounter() {
         let (scene, view) = makeClassicScene(seed: 111)
         _ = view
         scene.clearAllEntitiesForTesting()
@@ -84,10 +84,110 @@ final class ClassicModeTests: GameCoreTestCase {
         // Ein zusätzlicher Fixed-Step vermeidet eine reine Double-Rundungsgrenze bei 127/60.
         advance(scene, steps: Int(round(ClassicTuning.waveDelay / GameScene.simStep)) + 1)
 
+        XCTAssertEqual(scene.classicSession.wave, 1)
+        XCTAssertTrue(scene.activeAsteroids.isEmpty)
+        XCTAssertTrue(scene.activeUFOs.contains { $0 === saucer },
+                      "Atari wartet vor dem nächsten Satz Felsen auf die aktive Untertasse")
+
+        saucer.position.x = arenaSize.width
+        scene.advanceOneStep()
+
         XCTAssertEqual(scene.classicSession.wave, 2)
         XCTAssertEqual(scene.activeAsteroids.count, 6)
-        XCTAssertTrue(scene.activeUFOs.contains { $0 === saucer },
-                      "Eine aktive Untertasse darf den nächsten Satz Felsen nicht verzögern")
+        XCTAssertTrue(scene.activeUFOs.isEmpty)
+        XCTAssertEqual(scene.classicSession.saucerTimerTicks,
+                       ClassicTuning.saucerWaveDelayTicks)
+    }
+
+    func testClassicSaucerEntryUsesAtariCounterCadenceAndProgressiveReload() throws {
+        let (scene, view) = makeClassicScene(seed: 0xEDE1A7)
+        _ = view
+        scene.clearAllEntitiesForTesting()
+        addFarClassicAsteroids(1, to: scene)
+
+        let firstEntrySteps = ClassicTuning.saucerWaveDelayTicks
+            * ClassicTuning.saucerTimerSimulationSteps
+        advance(scene, steps: firstEntrySteps - 1)
+        XCTAssertTrue(scene.activeUFOs.isEmpty)
+
+        scene.advanceOneStep()
+        XCTAssertEqual(scene.activeUFOs.count, 1)
+        XCTAssertEqual(scene.classicSession.saucerTimerReloadTicks, 0x8C)
+
+        let firstSaucer = try XCTUnwrap(scene.activeUFOs.first)
+        firstSaucer.position.x = arenaSize.width
+        scene.advanceOneStep()
+        XCTAssertTrue(scene.activeUFOs.isEmpty)
+        XCTAssertEqual(scene.classicSession.saucerTimerTicks, 0x8C)
+
+        scene.classicSession.saucerTimerTicks = 1
+        scene.classicSession.saucerTimerStepPhase = 0
+        advance(scene, steps: ClassicTuning.saucerTimerSimulationSteps)
+        XCTAssertEqual(scene.activeUFOs.count, 1)
+        XCTAssertEqual(scene.classicSession.saucerTimerReloadTicks, 0x86)
+    }
+
+    func testClassicSaucerEntryCounterPausesForShipAndSaucer() {
+        let (scene, view) = makeClassicScene(seed: 0x5A0CE2)
+        _ = view
+        scene.clearAllEntitiesForTesting()
+        addFarClassicAsteroids(1, to: scene)
+        scene.classicSession.saucerTimerTicks = 1
+        scene.classicSession.saucerTimerStepPhase = 0
+        scene.classicSession.shipPhase = .destroyed(reappearAt: .greatestFiniteMagnitude)
+        scene.ship.isHidden = true
+
+        advance(scene, steps: ClassicTuning.saucerTimerSimulationSteps)
+        XCTAssertEqual(scene.classicSession.saucerTimerTicks, 1)
+        XCTAssertTrue(scene.activeUFOs.isEmpty)
+
+        scene.classicSession.shipPhase = .active
+        scene.ship.isHidden = false
+        advance(scene, steps: ClassicTuning.saucerTimerSimulationSteps)
+        XCTAssertEqual(scene.activeUFOs.count, 1)
+
+        scene.classicSession.saucerTimerTicks = 1
+        advance(scene, steps: ClassicTuning.saucerTimerSimulationSteps)
+        XCTAssertEqual(scene.classicSession.saucerTimerTicks, 1,
+                       "Eine aktive Untertasse hält Ataris Eintrittszähler an")
+    }
+
+    func testClassicSaucerRecentHitGateRetriesUntilRockCountFallsBelowThreshold() {
+        let (scene, view) = makeClassicScene(seed: 0x50)
+        _ = view
+        scene.clearAllEntitiesForTesting()
+        let threshold = ClassicTuning.saucerRockThreshold(for: 1)
+        addFarClassicAsteroids(threshold, to: scene)
+        scene.classicSession.saucerAsteroidHitTimerTicks = ClassicTuning.saucerAsteroidHitTicks
+        scene.classicSession.saucerTimerTicks = 1
+        scene.classicSession.saucerTimerStepPhase = 0
+
+        advance(scene, steps: ClassicTuning.saucerTimerSimulationSteps)
+        XCTAssertTrue(scene.activeUFOs.isEmpty)
+        XCTAssertEqual(scene.classicSession.saucerTimerTicks, ClassicTuning.saucerRetryTicks)
+        XCTAssertEqual(scene.classicSession.saucerAsteroidHitTimerTicks,
+                       ClassicTuning.saucerAsteroidHitTicks - 1)
+
+        let removedRock = scene.activeAsteroids.removeLast()
+        removedRock.removeFromParent()
+        scene.classicSession.saucerTimerTicks = 1
+        scene.classicSession.saucerTimerStepPhase = 0
+        advance(scene, steps: ClassicTuning.saucerTimerSimulationSteps)
+        XCTAssertEqual(scene.activeUFOs.count, 1)
+    }
+
+    func testClassicSaucerReloadDropsBySixToAtariFloor() {
+        let (scene, view) = makeClassicScene(seed: 0x92)
+        _ = view
+        scene.clearAllEntitiesForTesting()
+
+        for appearance in 1...24 {
+            _ = scene.spawnClassicSaucer()
+            let expected = max(ClassicTuning.saucerMinimumReloadTicks,
+                               ClassicTuning.saucerInitialReloadTicks
+                                   - appearance * ClassicTuning.saucerReloadStepTicks)
+            XCTAssertEqual(scene.classicSession.saucerTimerReloadTicks, expected)
+        }
     }
 
     func testClassicCapReducesSplitChildrenAndUsesArcadeScore() {
@@ -103,6 +203,8 @@ final class ClassicModeTests: GameCoreTestCase {
         scene.addLaserForTesting(mediumShot)
         scene.advanceOneStep()
         XCTAssertEqual(scene.score, 50)
+        XCTAssertEqual(scene.classicSession.saucerAsteroidHitTimerTicks,
+                       ClassicTuning.saucerAsteroidHitTicks)
 
         scene.clearAllEntitiesForTesting()
         scene.score = 0
@@ -506,7 +608,7 @@ final class ClassicModeTests: GameCoreTestCase {
         scene.advanceOneStep()
 
         let replay = scene.currentReplayForTesting()
-        XCTAssertEqual(Replay.currentLogicVersion, 5)
+        XCTAssertEqual(Replay.currentLogicVersion, 6)
         XCTAssertEqual(replay?.gameMode.rawValue, 2)
         XCTAssertEqual(replay?.startLevel, 1)
         XCTAssertEqual(replay?.autoFire, false)

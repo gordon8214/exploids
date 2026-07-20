@@ -218,11 +218,11 @@ final class ReplayDeterminismTests: GameCoreTestCase {
         XCTAssertLessThan(data.count, 8000, "Eine kurze Aufnahme sollte wenige KB groß sein (war \(data.count) B)")
     }
 
-    /// Versions-Tag: v3/v4 bleiben nur für die von v4/v5 unveränderten Ancient-/Mad-Modi kompatibel.
+    /// v3/v4/v5 bleiben nur für die von den Classic-Änderungen unveränderten Standardmodi kompatibel.
     func testReplayVersionCompatibility() {
         let ok = Replay(seed: 1, startLevel: 1, gameMode: .ancientAsteroids, events: [], frameCount: 0)
         XCTAssertTrue(ok.isCompatible)
-        for version in [3, 4] {
+        for version in [3, 4, 5] {
             let legacyAncient = Replay(version: version, seed: 1, startLevel: 1,
                                        gameMode: .ancientAsteroids, events: [], frameCount: 0)
             let legacyMad = Replay(version: version, seed: 1, startLevel: 1,
@@ -243,7 +243,7 @@ final class ReplayDeterminismTests: GameCoreTestCase {
     }
 
     func testStartReplayAcceptsLegacyStandardButRejectsLegacyClassic() {
-        for version in [3, 4] {
+        for version in [3, 4, 5] {
             let standardScene = GameScene(size: CGSize(width: 1000, height: 800))
             let standardView = SKView(frame: CGRect(x: 0, y: 0, width: 1000, height: 800))
             standardView.presentScene(standardScene)

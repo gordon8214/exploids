@@ -83,7 +83,7 @@ sondern darin, die Simulation vollständig **deterministisch** zu machen.
   Phase 3 (Fixed-Timestep) entfällt die `dt`-Folge.
 - **Versionsbindung:** Jede Aufnahme trägt das Logik-Versions-Tag. Beim Abspielen wird ein Mismatch
   grundsätzlich abgelehnt; eine ältere Version bleibt nur nach expliziter, modusspezifischer
-  Kompatibilitätsentscheidung zugelassen (aktuell v3/v4 für unveränderte Ancient-/Mad-Läufe).
+  Kompatibilitätsentscheidung zugelassen (aktuell v3/v4/v5 für unveränderte Ancient-/Mad-Läufe).
 - **Audio bleibt außen vor:** Sound wird beim Replay aus Spielereignissen neu getriggert, nicht
   aufgezeichnet. Audio-Zufall (SoundManager) muss daher nicht geseedet werden.
 

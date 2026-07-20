@@ -28,6 +28,20 @@ enum ClassicTuning {
     /// Beim Zielen zieht der Arcadecode 32 Bewegungsframes vom Abstand ab, bevor er den Winkel bildet.
     static let saucerAimCompensationDuration: TimeInterval = 32.0 / 60.0
     static let angleStep: CGFloat = 2.0 * .pi / 256.0
+    /// Ataris ENEMY-Routine bearbeitet die Eintrittszähler nur in jedem vierten 60-Hz-Frame,
+    /// entsprechend acht Schritten der festen 120-Hz-Simulation.
+    static let saucerTimerSimulationSteps = 8
+    /// Eine neue Welle setzt EDELAY auf $7F.
+    static let saucerWaveDelayTicks = 0x7F
+    /// SEDLAY beginnt bei $92 und sinkt nach jedem Eintritt um $06 bis zur Untergrenze $20.
+    static let saucerInitialReloadTicks = 0x92
+    static let saucerMinimumReloadTicks = 0x20
+    static let saucerReloadStepTicks = 0x06
+    /// Falls die Felsbedingung einen Eintritt blockiert, prüft das Original nach 18 Ticks erneut.
+    static let saucerRetryTicks = 18
+    /// Jeder Felstreffer setzt RTIMER auf $50; solange er läuft, darf die Untertasse erst bei
+    /// hinreichend wenigen verbliebenen Felsen erscheinen.
+    static let saucerAsteroidHitTicks = 0x50
 
     static func largeAsteroidCount(for wave: Int) -> Int {
         switch wave {
@@ -37,6 +51,10 @@ enum ClassicTuning {
         case 4: return 10
         default: return 11
         }
+    }
+
+    static func saucerRockThreshold(for wave: Int) -> Int {
+        min(10, 5 + max(1, wave))
     }
 }
 
@@ -56,7 +74,10 @@ struct ClassicSession {
     /// damit Quit-Bestätigung/Pause keine Respawn-, Hyperraum- oder Wellenfristen verbraucht.
     var elapsedTime: TimeInterval = 0.0
     var waveStartDeadline: TimeInterval?
-    var nextSaucerTime: TimeInterval = 12.0
+    var saucerTimerTicks = ClassicTuning.saucerWaveDelayTicks
+    var saucerTimerReloadTicks = ClassicTuning.saucerInitialReloadTicks
+    var saucerAsteroidHitTimerTicks = 0
+    var saucerTimerStepPhase = 0
     var saucerAppearances = 0
     var nextHeartbeatTime: TimeInterval = 0.0
     var heartbeatHigh = false
@@ -139,7 +160,7 @@ extension GameScene {
         updateClassicSaucers(deltaTime: deltaTime, currentTime: currentTime)
         resolveClassicCollisions()
         updateClassicWave(currentTime: currentTime)
-        updateClassicSaucerSpawning(currentTime: currentTime)
+        updateClassicSaucerSpawning()
         updateClassicHeartbeat(currentTime: currentTime)
     }
 
@@ -322,6 +343,7 @@ extension GameScene {
         classicSession.waveHits = 0
         classicSession.possibleWaveHits = count * 7
         classicSession.waveStartDeadline = nil
+        classicSession.saucerTimerTicks = ClassicTuning.saucerWaveDelayTicks
         classicSession.nextHeartbeatTime = classicSession.elapsedTime + 0.35
         for _ in 0..<count { spawnClassicLargeAsteroid() }
     }
@@ -332,7 +354,8 @@ extension GameScene {
                 classicSession.waveStartDeadline = currentTime + ClassicTuning.waveDelay
             }
             if let deadline = classicSession.waveStartDeadline,
-               currentTime >= deadline {
+               currentTime >= deadline,
+               activeUFOs.isEmpty {
                 classicSession.wave += 1
                 currentLevel = classicSession.wave
                 levelLabel.text = "WAVE: \(classicSession.wave)"
@@ -349,6 +372,7 @@ extension GameScene {
         activeAsteroids.removeAll { $0 === asteroid }
         asteroid.removeFromParent()
         classicSession.waveHits += 1
+        classicSession.saucerAsteroidHitTimerTicks = ClassicTuning.saucerAsteroidHitTicks
 
         if awardsPlayerPoints {
             let points: Int
@@ -404,13 +428,34 @@ extension GameScene {
 
     // MARK: - Untertassen
 
-    private func updateClassicSaucerSpawning(currentTime: TimeInterval) {
-        guard isSpawningEnabled, !activeAsteroids.isEmpty, activeUFOs.isEmpty,
-              currentTime >= classicSession.nextSaucerTime else { return }
+    private func updateClassicSaucerSpawning() {
+        classicSession.saucerTimerStepPhase += 1
+        guard classicSession.saucerTimerStepPhase >= ClassicTuning.saucerTimerSimulationSteps else {
+            return
+        }
+        classicSession.saucerTimerStepPhase = 0
+
+        // ENEMY hält beide Zähler an, solange eine Untertasse lebt oder das Schiff nicht im
+        // Spiel ist. Der globale Vier-Frame-Takt läuft dabei weiter.
+        guard isSpawningEnabled, activeUFOs.isEmpty,
+              classicSession.isShipActive, !ship.isHidden else { return }
+
+        if classicSession.saucerAsteroidHitTimerTicks > 0 {
+            classicSession.saucerAsteroidHitTimerTicks -= 1
+        }
+        if classicSession.saucerTimerTicks > 0 {
+            classicSession.saucerTimerTicks -= 1
+        }
+        guard classicSession.saucerTimerTicks == 0 else { return }
+
+        // Das Original lädt den kurzen Wiederholungszähler schon vor der Felsprüfung.
+        classicSession.saucerTimerTicks = ClassicTuning.saucerRetryTicks
+        if classicSession.saucerAsteroidHitTimerTicks > 0 {
+            guard !activeAsteroids.isEmpty,
+                  activeAsteroids.count < ClassicTuning.saucerRockThreshold(for: classicSession.wave)
+            else { return }
+        }
         _ = spawnClassicSaucer()
-        let scorePressure = min(4.0, Double(score) / 10_000.0)
-        let delay = Double.random(in: 9.0...15.0, using: &rng) - scorePressure
-        classicSession.nextSaucerTime = currentTime + max(5.0, delay)
     }
 
     @discardableResult
@@ -430,12 +475,17 @@ extension GameScene {
         addChild(ufo)
         activeUFOs.append(ufo)
         classicSession.saucerAppearances += 1
+        classicSession.saucerTimerReloadTicks = max(
+            ClassicTuning.saucerMinimumReloadTicks,
+            classicSession.saucerTimerReloadTicks - ClassicTuning.saucerReloadStepTicks
+        )
         SoundManager.shared.setClassicSaucer(isSmall: isSmall)
         return ufo
     }
 
     private func updateClassicSaucers(deltaTime: TimeInterval, currentTime: TimeInterval) {
         var survivors: [UFO] = []
+        var didRemoveSaucer = false
         for ufo in activeUFOs {
             if currentTime >= ufo.classicNextCourseChange {
                 let courses: [CGFloat] = [
@@ -469,12 +519,29 @@ extension GameScene {
 
             if ufo.isExited(screenSize: size) {
                 ufo.removeFromParent()
+                didRemoveSaucer = true
             } else {
                 survivors.append(ufo)
             }
         }
         activeUFOs = survivors
+        if didRemoveSaucer {
+            resetClassicSaucerTimerAfterRemoval()
+        }
         SoundManager.shared.setClassicSaucer(isSmall: activeUFOs.first?.isSmall)
+    }
+
+    private func removeClassicSaucer(_ ufo: UFO) {
+        guard activeUFOs.contains(where: { $0 === ufo }) else { return }
+        activeUFOs.removeAll { $0 === ufo }
+        ufo.removeFromParent()
+        resetClassicSaucerTimerAfterRemoval()
+        SoundManager.shared.setClassicSaucer(isSmall: activeUFOs.first?.isSmall)
+    }
+
+    private func resetClassicSaucerTimerAfterRemoval() {
+        guard activeUFOs.isEmpty else { return }
+        classicSession.saucerTimerTicks = classicSession.saucerTimerReloadTicks
     }
 
     // MARK: - Kollisionen
@@ -499,8 +566,7 @@ extension GameScene {
                     return CollisionHelper.isPointInPolygon(segment.0, polygon: polygon)
                         || CollisionHelper.isPointInPolygon(segment.1, polygon: polygon)
                 }) {
-                    activeUFOs.removeAll { $0 === ufo }
-                    ufo.removeFromParent()
+                    removeClassicSaucer(ufo)
                     laser.removeFromParent()
                     addClassicScore(ufo.pointValue)
                     SoundManager.shared.playClassicExplosion()
@@ -527,8 +593,7 @@ extension GameScene {
                 CollisionHelper.polygonsIntersect(ufo.getWorldVertices(), $0.getWorldVertices())
             }) else { continue }
             _ = breakClassicAsteroid(asteroid, awardsPlayerPoints: false)
-            activeUFOs.removeAll { $0 === ufo }
-            ufo.removeFromParent()
+            removeClassicSaucer(ufo)
             SoundManager.shared.playClassicExplosion()
             createClassicVectorDebris(at: ufo.position, pieces: 5)
         }
@@ -551,8 +616,7 @@ extension GameScene {
         if let ufo = activeUFOs.first(where: {
             CollisionHelper.polygonsIntersect(shipPolygon, $0.getWorldVertices())
         }) {
-            activeUFOs.removeAll { $0 === ufo }
-            ufo.removeFromParent()
+            removeClassicSaucer(ufo)
             addClassicScore(ufo.pointValue)
             createClassicVectorDebris(at: ufo.position, pieces: 5)
             destroyClassicShip(cause: .ufo)
